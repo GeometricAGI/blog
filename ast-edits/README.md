@@ -11,7 +11,7 @@ This benchmark compares 7 code editing formats used by AI coding tools:
 | **Whole file** | Model regenerates the entire file |
 | **Search/replace** | Exact-match find/replace blocks |
 | **Unified diff** | Standard `@@` hunk-based diffs |
-| **AST edit** | JSON operations targeting functions/classes by name |
+| **AST edit** | AST-targeted operations on functions/classes by name |
 | **Hashline JSON ops** | JSON operations referencing content-hashed line tags |
 | **Hashline search/replace** | Tag-anchored search/replace (no verbatim old code) |
 | **Hashline unified diff** | Tag-anchored diff (no context line reproduction) |
