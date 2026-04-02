@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ast-edits-code-editing-format"
+version = "0.1.0"
+description = "Benchmark comparing 7 code editing formats for LLMs"
+requires-python = ">=3.11, <3.13"
+dependencies = [
+    "click>=8.0",
+    "litellm",
+    "python-dotenv",
+    "matplotlib>=3.10",
+    "numpy>=2.0",
+]
+
+[project.scripts]
+run-edit-experiment = "localised_edit_experiments.run_experiment:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["localised_edit_experiments"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
