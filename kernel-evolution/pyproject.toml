@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kernel-evolution"
+version = "0.1.0"
+description = "Code for 'Evolving GPU Kernels with LLMs' blog post"
+requires-python = ">=3.11, <3.13"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "Pillow",
+]
+
+[tool.hatch.build.targets.wheel]
+only-include = []
