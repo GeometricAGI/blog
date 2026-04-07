@@ -55,7 +55,7 @@ def distance(x1, y1, x2, y2):
 
 ![Classical GP mutations breaking code](figures/classical_gp.gif)
 
-In the language of the previous post: classical GP mutations destroy the *ergodicity* condition in practice. Technically, random mutations *can* reach any program given infinite time. But the probability of a useful mutation is so vanishingly small that you'd need exponential time to find one -- exactly the regime [Dang et al. (2016)](https://doi.org/10.1007/978-3-319-45823-6_13) showed leads to exponential escape times.
+In the language of the previous post: classical GP mutations destroy the *ergodicity* condition in practice. Technically, random mutations *can* reach any program given infinite time. But the probability of a useful mutation is so vanishingly small that you'd need exponential time to find one -- exactly the regime [Dang et al. (2016)](https://doi.org/10.1145/2908812.2908956) showed leads to exponential escape times.
 
 ## LLMs: The Ideal Mutation Operator
 
@@ -66,9 +66,11 @@ Large language models fix this. Instead of random structural perturbations, an L
 - **Produce code that compiles and runs.** Most LLM-generated mutations are syntactically valid.
 - **Control diversity directly via temperature.** Low temperature produces conservative edits; high temperature produces radical rewrites.
 
-In evolutionary terms, LLMs give you **structured diversity** -- meaningful variation in the algorithm dimension while maintaining stability in the syntax dimension. They satisfy the ergodicity condition *practically*, not just theoretically: an LLM can generate any valid kernel, and it does so with high enough probability that escape from local optima happens in reasonable time.
+This idea -- using LLMs as variation operators in an evolutionary loop -- has strong recent precedent. [Lehman et al. (2022)](https://arxiv.org/abs/2206.08896) introduced Evolution through Large Models (ELM), showing that LLMs trained on code can serve as mutation operators for genetic programming, generating hundreds of thousands of functional programs in a domain absent from training data. [Meyerson et al. (2023)](https://arxiv.org/abs/2302.12170) formalised why this works: LLM-based crossover implicitly builds a probabilistic model of parent genotypes and samples offspring, connecting it to Estimation of Distribution Algorithms. The pre-trained distribution concentrates mass on syntactically valid, semantically coherent programs, so most mutations stay in a productive neighbourhood.
 
-LLMs add diversity where it matters (algorithmic choices) and stability where it matters (code correctness).
+Google DeepMind's [FunSearch (Romera-Paredes et al., 2024)](https://www.nature.com/articles/s41586-023-06924-6) applied this to mathematical discovery, pairing an LLM with an evaluator in an island-based evolutionary loop to find new constructions for the cap set problem. Its successor [AlphaEvolve (Novikov et al., 2025)](https://arxiv.org/abs/2506.13131) operates directly on code diffs and achieved a 23% speedup on a critical Gemini training kernel -- the closest published precedent to what we do.
+
+In evolutionary terms, LLMs give you **structured diversity**: meaningful variation in algorithmic choices while maintaining syntactic stability. They satisfy the ergodicity condition *practically*, not just theoretically. An LLM can generate any valid kernel, and it does so with high enough probability that escape from local optima happens in reasonable time.
 
 ## Why Kernels Are Especially Hard
 
@@ -158,19 +160,18 @@ The core math is identical. The data movement is completely different. This requ
 
 ## Connecting Back to Theory
 
-Recall [Rudolph's (1994)](https://doi.org/10.1109/TNNLS.1994.283510) three conditions for guaranteed convergence to the global optimum:
+Recall [Rudolph's (1994)](https://doi.org/10.1109/72.265964) convergence result: an EA with elitism and an ergodic mutation operator converges to the global optimum almost surely. Our system satisfies both conditions:
 
-| Condition | How Our System Satisfies It |
+| Condition | How our system satisfies it |
 |-----------|-----------------------------|
 | **Elitism** | We always keep the best kernels across generations. |
 | **Ergodicity** | LLMs can generate any valid kernel -- and unlike random mutation, they do so with practical probability. |
-| **Selection pressure** | Faster kernels are more likely to survive to the next generation. |
 
-And recall [Dang et al.'s (2016)](https://doi.org/10.1007/978-3-319-45823-6_13) result: **diversity reduces escape time from exponential to polynomial.**
+And recall [Dang et al.'s (2016, 2018)](https://doi.org/10.1109/TEVC.2017.2724201) result: on problems with deceptive local optima, a mutation-only EA needs exponential time to escape, while a diverse population with crossover does it in polynomial time.
 
-Our system satisfies all three convergence conditions. The LLM makes ergodicity *practical* -- it concentrates mutations on promising directions while maintaining the theoretical ability to reach any valid kernel. And the diversity knobs (temperature, planning prompts, insight sharing) give us direct control over the exploration--exploitation tradeoff that Dang et al. showed is the difference between polynomial and exponential convergence.
+The LLM makes ergodicity *practical* -- it concentrates mutations on promising directions while maintaining the theoretical ability to reach any valid kernel. And the diversity knobs (temperature, planning prompts, insight sharing) give us direct control over the exploration--exploitation tradeoff that [Dang et al.](https://doi.org/10.1145/2908812.2908956) showed determines whether convergence is polynomial or exponential.
 
-The key insight: **how we manage diversity determines how fast we converge.** The theoretical guarantee of eventual convergence (Rudolph) is only useful if the convergence time is reasonable (Dang et al.). And the convergence time is only reasonable if the population maintains the right level of diversity at the right time.
+How we manage diversity determines how fast we converge. The theoretical guarantee of eventual convergence (Rudolph) is only useful if convergence time is reasonable (Dang et al.). And convergence time is only reasonable if the population maintains the right level of diversity at the right time.
 
 ## What's Next
 
@@ -188,10 +189,20 @@ Whether the individuals are points in $\mathbb{R}^2$ or GPU kernels in CuTe DSL,
 
 ## References
 
-1. G. Rudolph. *Convergence Analysis of Canonical Genetic Algorithms.* IEEE Transactions on Neural Networks, 5(1):96--101, 1994. [doi:10.1109/TNNLS.1994.283510](https://doi.org/10.1109/TNNLS.1994.283510)
+1. G. Rudolph. *Convergence Analysis of Canonical Genetic Algorithms.* IEEE Transactions on Neural Networks, 5(1):96--101, 1994. [doi:10.1109/72.265964](https://doi.org/10.1109/72.265964)
 
-2. D.-C. Dang, T. Jansen, P.K. Lehre, P.S. Oliveto, D. Sudholt. *Escaping Local Optima using Crossover with Mutation.* Parallel Problem Solving from Nature (PPSN XIV), pp. 160--170, 2016. [doi:10.1007/978-3-319-45823-6_13](https://doi.org/10.1007/978-3-319-45823-6_13)
+2. D.-C. Dang, T. Friedrich, M. Kötzing, M.S. Krejca, P.K. Lehre, P.S. Oliveto, D. Sudholt, A.M. Sutton. *Escaping Local Optima with Diversity Mechanisms and Crossover.* GECCO 2016, pp. 645--652. [doi:10.1145/2908812.2908956](https://doi.org/10.1145/2908812.2908956)
 
-3. J.R. Koza. *Genetic Programming: On the Programming of Computers by Means of Natural Selection.* MIT Press, 1992.
+3. D.-C. Dang et al. *Escaping Local Optima using Crossover with Emergent Diversity.* IEEE Transactions on Evolutionary Computation, 22(3):484--497, 2018. [doi:10.1109/TEVC.2017.2724201](https://doi.org/10.1109/TEVC.2017.2724201)
 
-4. M. Chen, J. Tworek, H. Jun, et al. *Evaluating Large Language Models Trained on Code.* arXiv:2107.03374, 2021.
+4. J. Lehman, J. Gordon, S. Jain, K. Ndousse, C. Yeh, K.O. Stanley. *Evolution through Large Models.* arXiv:2206.08896, 2022.
+
+5. E. Meyerson, M.J. Nelson, H. Bradley, A. Gaier, A. Moradi, A.K. Hoover, J. Lehman. *Language Model Crossover: Variation through Few-Shot Prompting.* ACM Transactions on Evolutionary Learning and Optimization, 2024. [arXiv:2302.12170](https://arxiv.org/abs/2302.12170)
+
+6. B. Romera-Paredes et al. *Mathematical Discoveries from Program Search with Large Language Models.* Nature, 625:468--475, 2024.
+
+7. A. Novikov et al. *AlphaEvolve: A Coding Agent for Scientific and Algorithmic Discovery.* arXiv:2506.13131, 2025.
+
+8. J.R. Koza. *Genetic Programming: On the Programming of Computers by Means of Natural Selection.* MIT Press, 1992.
+
+9. A. Ouyang et al. *KernelBench: Can LLMs Write Efficient GPU Kernels?* ICML 2025. [arXiv:2502.10517](https://arxiv.org/abs/2502.10517)
