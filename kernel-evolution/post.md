@@ -1,4 +1,16 @@
-# Evolving GPU Kernels with LLMs: From Diversity Theory to 1.7x Speedups
+---
+layout: post
+title: "Evolving GPU Kernels with LLMs"
+date: 2026-04-07
+author:
+  name: Jack Foxabbott
+  title: Founding Member of Technical Staff
+  linkedin: https://www.linkedin.com/in/foxabbott/
+---
+
+*By [Jack Foxabbott](https://www.linkedin.com/in/foxabbott/), Founding Member of Technical Staff*
+
+# Evolving GPU Kernels with LLMs
 
 *How we use large language models as mutation operators in an evolutionary algorithm to discover optimised GPU kernels -- and why controlling diversity is still the key.*
 
@@ -6,9 +18,9 @@
 
 In the [previous post](../evolution-diversity/post.md), we showed that diversity is the secret ingredient in evolutionary algorithms. Too little and the population collapses to a local optimum. Too much and it wanders randomly. Get the balance right and you provably converge to the global optimum in polynomial time.
 
-That was on a continuous function in $\mathbb{R}^2$. Now let's crank up the difficulty. What happens when the "individuals" in your population are not points on a heatmap but *programs* -- specifically, GPU kernels -- and the search space is the space of all valid code?
+That was on a continuous function in $\mathbb{R}^2$. Now the individuals are not points on a heatmap but *programs* -- specifically, GPU kernels -- and the search space is the space of all valid code.
 
-The diversity story doesn't just carry over. It gets *more* important, because the search space is harder, evaluation is expensive, and most random changes to code are catastrophically destructive.
+The diversity story carries over, and it matters more here: the search space is harder, evaluation is expensive, and most random changes to code are destructive.
 
 ## The Problem: GPU Kernels Are Hard
 
@@ -43,20 +55,20 @@ def distance(x1, y1, x2, y2):
 
 ![Classical GP mutations breaking code](figures/classical_gp.gif)
 
-In the language of the previous post: classical GP mutations destroy the *ergodicity* condition in practice. Technically, random mutations *can* reach any program given infinite time. But the probability of a useful mutation is so vanishingly small that you'd need exponential time to find one -- exactly the regime Dang et al. (2016) warned us about.
+In the language of the previous post: classical GP mutations destroy the *ergodicity* condition in practice. Technically, random mutations *can* reach any program given infinite time. But the probability of a useful mutation is so vanishingly small that you'd need exponential time to find one -- exactly the regime [Dang et al. (2016)](https://doi.org/10.1007/978-3-319-45823-6_13) showed leads to exponential escape times.
 
 ## LLMs: The Ideal Mutation Operator
 
-Large language models change the game. Instead of random structural perturbations, an LLM can:
+Large language models fix this. Instead of random structural perturbations, an LLM can:
 
 - **Understand code semantics**, so mutations are *meaningful*, not random.
 - **Read documentation and hardware specs** to guide changes toward known optimisation strategies.
-- **Produce code that compiles and runs.** Most LLM-generated mutations are syntactically valid -- a dramatic improvement over classical GP.
+- **Produce code that compiles and runs.** Most LLM-generated mutations are syntactically valid.
 - **Control diversity directly via temperature.** Low temperature produces conservative edits; high temperature produces radical rewrites.
 
 In evolutionary terms, LLMs give you **structured diversity** -- meaningful variation in the algorithm dimension while maintaining stability in the syntax dimension. They satisfy the ergodicity condition *practically*, not just theoretically: an LLM can generate any valid kernel, and it does so with high enough probability that escape from local optima happens in reasonable time.
 
-The bottom line: LLMs add diversity where it matters (algorithmic choices) and stability where it matters (code correctness).
+LLMs add diversity where it matters (algorithmic choices) and stability where it matters (code correctness).
 
 ## Why Kernels Are Especially Hard
 
@@ -72,7 +84,7 @@ Every evaluation is expensive, which means every mutation must count. This makes
 
 ## Our System: Neural Kernel Search
 
-Here's how we put it all together. The system follows the standard evolutionary loop, with LLM-powered mutation:
+The system follows a standard evolutionary loop, with LLM-powered mutation:
 
 ```
 Population --> LLM Mutation --> Validation --> Profiling --> Selection
@@ -146,7 +158,7 @@ The core math is identical. The data movement is completely different. This requ
 
 ## Connecting Back to Theory
 
-Recall Rudolph's (1994) three conditions for guaranteed convergence to the global optimum:
+Recall [Rudolph's (1994)](https://doi.org/10.1109/TNNLS.1994.283510) three conditions for guaranteed convergence to the global optimum:
 
 | Condition | How Our System Satisfies It |
 |-----------|-----------------------------|
@@ -154,7 +166,7 @@ Recall Rudolph's (1994) three conditions for guaranteed convergence to the globa
 | **Ergodicity** | LLMs can generate any valid kernel -- and unlike random mutation, they do so with practical probability. |
 | **Selection pressure** | Faster kernels are more likely to survive to the next generation. |
 
-And recall Dang et al.'s (2016) result: **diversity reduces escape time from exponential to polynomial.**
+And recall [Dang et al.'s (2016)](https://doi.org/10.1007/978-3-319-45823-6_13) result: **diversity reduces escape time from exponential to polynomial.**
 
 Our system satisfies all three convergence conditions. The LLM makes ergodicity *practical* -- it concentrates mutations on promising directions while maintaining the theoretical ability to reach any valid kernel. And the diversity knobs (temperature, planning prompts, insight sharing) give us direct control over the exploration--exploitation tradeoff that Dang et al. showed is the difference between polynomial and exponential convergence.
 
@@ -162,36 +174,17 @@ The key insight: **how we manage diversity determines how fast we converge.** Th
 
 ## What's Next
 
-Kernel evolution is still early. Some directions we're excited about:
+Kernel evolution is still early. Some open directions:
 
 - **Better diversity metrics for code.** How do you measure the "spread" of a population of kernel implementations? Solving this would let us adaptively control diversity the way we adaptively control mutation strength in the Rastrigin example.
 - **Multi-objective Pareto evolution.** Currently we optimise primarily for latency. Extending to explicit Pareto frontiers over latency, memory, and numerical precision would better match real deployment constraints.
 - **Transfer across architectures.** Can a population evolved on H100 seed the search on B200, bootstrapping the process instead of starting from scratch?
 
-The fundamental insight from the Rastrigin example carries through unchanged: **controlling diversity is the key to efficient evolutionary search.** Whether your individuals are points in $\mathbb{R}^2$ or GPU kernels written in CuTe DSL, the same theoretical principles apply. LLMs just make them practical.
+Whether the individuals are points in $\mathbb{R}^2$ or GPU kernels in CuTe DSL, the same principle applies: **controlling diversity is the key to efficient evolutionary search.** LLMs make it practical.
 
 ---
 
-## Reproduce It Yourself
-
-The scripts to generate the figures in this post are included in this directory:
-
-```bash
-pip install numpy matplotlib Pillow
-
-# Classical GP mutation animation
-python classical_gp.py
-
-# Code diff visualisation
-python code_diff.py
-
-# Speedup chart
-python speedup_chart.py
-```
-
-Figures are saved to `figures/`.
-
----
+*All code to generate the figures in this post is available at [github.com/GeometricAGI/blog](https://github.com/GeometricAGI/blog).*
 
 ## References
 
