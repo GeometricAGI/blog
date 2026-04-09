@@ -16,7 +16,7 @@ Evolutionary algorithms are simple. Maintain a population. Evaluate fitness. Kee
 
 But the loop isn't the hard part. **Controlling how diverse the population stays as the algorithm runs** is the hard part. Selection wants to collapse the population into a monoculture. Mutation wants to smear it back out. If you don't manage that tension you either collapse into a local optimum and sit there, or keep "exploring" forever and never cash it in.
 
-We'll build intuition on a continuous, brutally multimodal landscape (Rastrigin), then anchor that intuition in **five theoretical results** about convergence speed and how it depends on the exploration/exploitation balance. These results are mostly proved on stylised toy landscapes (bit strings, synthetic traps), because that's where the maths is sharp enough to separate polynomial-time from exponential-time behaviour. The proofs pin down exactly when "keep the best and mutate" is fast, slow, or outright doomed, and the mechanisms transfer to harder problems.
+We'll build intuition on a multimodal landscape (Rastrigin), then anchor that intuition in **five theoretical results** about convergence speed and how it depends on the exploration/exploitation balance. These results are mostly proved on stylised toy landscapes (bit strings, synthetic traps), because that's where the maths is sharp enough to separate polynomial-time from exponential-time behaviour. The proofs pin down exactly when "keep the best and mutate" is fast, slow, or outright doomed, and the mechanisms transfer to harder problems.
 
 The plot below sweeps across selection pressure (tournament size) and mutation strength ($\sigma$), running the same EA on the Rastrigin function for each combination and recording the best fitness found. Dark cells reached the global optimum; bright cells got stuck. There's a narrow diagonal of good settings; too aggressive on either axis and the algorithm fails in opposite ways.
 
@@ -26,7 +26,7 @@ The plot below sweeps across selection pressure (tournament size) and mutation s
 
 ## The Rastrigin function
 
-The Rastrigin function is a standard optimisation test problem because it's **regularly packed with local minima**: it looks like a rippled bowl, where the global best point is the bottom of the bowl, but there are countless tempting dents along the way.
+The Rastrigin function is a standard optimisation test problem because it's **regularly packed with local minima**: it looks like a rippled bowl, where the global best point is the bottom of the bowl, but there are many local dents along the way.
 
 In two dimensions:
 
@@ -150,7 +150,7 @@ The standard theoretical trap is the $\text{Jump}_k$ function: there is a broad 
 
 ![Crossover with diverse vs identical parents](figures/crossover_cartoon.png)
 
-Why does diversity matter here? Because crossover is only powerful when it recombines **different** parents. Diversity mechanisms keep multiple distinct individuals alive on the plateau, so crossover can assemble the global optimum from complementary partial structures instead of waiting for a single miraculous $k$-bit mutation. If selection collapses the population so that the plateau contains only near-identical individuals, crossover degenerates into "copy the same thing twice", and you're back to waiting $\Theta(n^k)$.
+Why does diversity matter here? Because crossover is only powerful when it recombines **different** parents. Diversity mechanisms keep multiple distinct individuals alive on the plateau, so crossover can assemble the global optimum from complementary partial structures instead of waiting for a single lucky $k$-bit mutation. If selection collapses the population so that the plateau contains only near-identical individuals, crossover degenerates into "copy the same thing twice", and you're back to waiting $\Theta(n^k)$.
 
 The [journal version (Dang et al., 2018)](https://doi.org/10.1109/TEVC.2017.2724201) studies seven diversity mechanisms and shows that all of them enable the exponential-to-polynomial speedup.
 
