@@ -239,15 +239,16 @@ def make_takeover_curves(save_path):
             fracs = [1.0 / pop_size]
 
             for step in range(1, max_steps + 1):
-                # Tournament selects a winner; winner replaces a random
-                # non-winner from the tournament (monotonic: best type
-                # can only spread, never be lost).
+                # Tournament selects a winner; winner replaces a
+                # uniformly random individual from the population.
+                # Monotonic: only update if the winner is best type
+                # and the replaced individual is not.
                 candidates = rng.choice(pop_size, min(ts, pop_size), replace=False)
-                if np.any(types[candidates] == 1):
-                    # Best type wins; replace a non-best candidate if any
-                    losers = candidates[types[candidates] == 0]
-                    if len(losers) > 0:
-                        types[rng.choice(losers)] = 1
+                winner_is_best = np.any(types[candidates] == 1)
+                if winner_is_best:
+                    slot = rng.integers(pop_size)
+                    if types[slot] == 0:
+                        types[slot] = 1
                 if step % record_every == 0:
                     fracs.append(np.mean(types == 1))
 
