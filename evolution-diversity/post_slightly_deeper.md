@@ -131,12 +131,12 @@ Once takeover happens, crossover starts recombining near-clones and mutation bec
 
 ### 3. Mutation rate has a phase transition
 
-The mutation probability $p$ in standard bitwise mutation has a sharp threshold, even on simple landscapes like linear functions.
+In standard bitwise mutation, each bit in the solution string is flipped independently with probability $p$. This $p$ has a sharp threshold, even on simple landscapes like linear functions.
 
-[Witt (2013)](https://doi.org/10.1017/S0963548312000600) proved tight bounds for the $(1+1)$ EA on any linear function:
+[Witt (2013)](https://doi.org/10.1017/S0963548312000600) proved tight bounds for the $(1+1)$ EA (the simplest elitist EA: keep one solution, produce one mutant, keep whichever is better) on any linear function:
 
-- If $p = \omega((\ln n)/n)$, the expected optimisation time is superpolynomial.
-- If $p = c/n$ for constant $c > 0$, then $E[T] = (1 \pm o(1)) \frac{e^c}{c}\, n \ln n$, and the asymptotic optimum is at $p \approx 1/n$.
+- If the mutation rate $p$ grows faster than $(\ln n)/n$ (where $n$ is the bit-string length), too many bits flip per step and the expected time to find the optimum becomes superpolynomial.
+- If $p = c/n$ for a constant $c > 0$, so that roughly one bit flips per step on average, the expected time is $E[T] = (1 \pm o(1)) \frac{e^c}{c} n \ln n$, which is polynomial. The best constant is $c \approx 1$, i.e. $p \approx 1/n$.
 
 ![Mutation rate phase transition: e^c/c curve](figures/mutation_phase_transition.png)
 
