@@ -16,7 +16,7 @@ Evolutionary algorithms are simple: maintain a population, evaluate fitness, kee
 
 The hard part is **controlling how diverse the population stays as the algorithm runs**. Selection wants to collapse the population into a monoculture. Mutation wants to smear it back out. If you don't manage that tension you either collapse into a local optimum and sit there, or keep "exploring" forever and never cash it in.
 
-We'll build intuition on a multimodal landscape (Rastrigin), then anchor that intuition in **five theoretical results** about convergence speed and how it depends on the exploration/exploitation balance. These results are mostly proved on stylised toy landscapes (bit strings, synthetic traps), because that's where the maths is sharp enough to separate polynomial-time from exponential-time behaviour. The proofs pin down exactly when "keep the best and mutate" is fast, slow, or outright doomed, and the mechanisms transfer to harder problems.
+We'll build intuition on a multimodal landscape (Rastrigin), then anchor that intuition in **five theoretical results** about convergence speed and how it depends on the exploration/exploitation balance. These results are mostly proved on stylised toy landscapes (bit strings, synthetic traps), because that's where the maths is sharp enough to separate polynomial-time from exponential-time behaviour. The proofs pin down exactly when "keep the best and mutate" is fast, slow, or outright doomed. The toy settings are deliberately simple, but the failure modes they expose (premature convergence from too much selection, random-walk behaviour from too much mutation) are the same ones that show up on real problems.
 
 ---
 
@@ -36,7 +36,11 @@ The global minimum is at $(0,0)$ with $f(0,0) = 0$. Any greedy, hill-climbing al
 
 ## The EA
 
-We ran the same EA on the Rastrigin function three times, varying two knobs: **selection pressure** (how aggressively we copy the best into the next generation) and **mutation strength** (how far offspring can jump from their parents). Everything else was identical: population size 30, elitism (always keep the best individual found so far), Gaussian mutation. The only thing changing is how quickly selection collapses diversity, versus how quickly mutation replenishes it.
+We ran the same EA on the Rastrigin function three times, varying two knobs: **selection pressure** and **mutation strength**. Everything else was identical: population size 30, elitism (always keep the best individual found so far), Gaussian mutation. The only thing changing is how quickly selection collapses diversity, versus how quickly mutation replenishes it.
+
+Selection here uses **tournament selection**: to choose each parent, pick $k$ individuals at random from the population and keep the fittest. Larger $k$ means stronger pressure toward the current best. Mutation uses **Gaussian perturbation**: add a random offset drawn from $\mathcal{N}(0, \sigma^2)$ to each coordinate of the parent. Larger $\sigma$ means bigger jumps, so more exploration but also more disruption of good solutions.
+
+Many EAs also use **crossover** (also called recombination): pick two parents and combine parts of each to produce a child. For bit strings this might mean taking the first half of one parent and the second half of the other; for continuous vectors it might mean averaging or blending coordinates. Crossover is different from mutation because it doesn't introduce new information, it rearranges what's already in the population. Our Rastrigin demo doesn't use crossover, but it plays a central role in the theoretical results below.
 
 ## Too little diversity
 
@@ -52,7 +56,7 @@ Tournament selection with size 2 (almost random). Gaussian mutations with $\sigm
 
 ![High diversity, no convergence](figures/diversity_high.gif)
 
-This is the opposite failure mode: diversity is maximal, but unstructured, and each generation is basically a fresh random sample. Selection isn't strong enough to amplify improvements into a stable lineage, so the algorithm can't compound its gains. This is random search wearing an evolutionary costume.
+This is the opposite failure mode: diversity is maximal, but unstructured, and each generation is basically a fresh random sample. Selection isn't strong enough to amplify improvements into a stable lineage, so the algorithm can't compound its gains.
 
 ## Balanced diversity
 
@@ -66,7 +70,7 @@ Selection *exploits* by copying what works, while mutation *explores* by trying 
 
 ## The full picture
 
-These three runs are points in a larger space. The plot below sweeps across selection pressure (tournament size) and mutation strength ($\sigma$), running the same EA for each combination and recording the best fitness found. Dark cells reached the global optimum; bright cells got stuck. There's a narrow diagonal of good settings; too aggressive on either axis and the algorithm fails in opposite ways.
+These three runs are points in a larger space. The plot below sweeps across selection pressure (tournament size) and mutation strength ($\sigma$), running the same EA for each combination and recording the best fitness found. Bright cells reached the global optimum; dark cells got stuck. There's a narrow diagonal of good settings; too aggressive on either axis and the algorithm fails in opposite ways.
 
 ![Phase diagram: selection pressure vs mutation strength](figures/phase_diagram.png)
 
@@ -94,7 +98,7 @@ A good diversity strategy doesn't maximise diversity. It makes sure the escape c
 
 ## Five theoretical results about convergence speed
 
-Below are five results that make the intuition above precise. Most are proved for bit-string EAs, because that's where you can cleanly separate polynomial from exponential runtime. The discrete setting doesn't limit the lessons; the mechanisms are the same.
+Below are five results that make the intuition above precise. Most are proved for bit-string EAs, because that's where you can cleanly separate polynomial from exponential runtime.
 
 ### 1. Elitism gives convergence, but not speed
 
@@ -112,10 +116,10 @@ The conditions are mild (elitism is a one-line code change, and Gaussian mutatio
 
 Selection pressure can be made precise, and the classic measure is **takeover time**: the expected number of selection iterations needed until the population consists entirely of copies of the initially-best individual (assuming it can't go extinct).
 
-[Rudolph (2000)](https://dl.acm.org/doi/10.5555/2933718.2933888) proved closed-form expressions for non-generational tournament selection with population size $n$:
+[Rudolph (2000)](https://dl.acm.org/doi/10.5555/2933718.2933888) proved closed-form expressions for tournament selection with population size $n$. Recall that a tournament of size $k$ picks $k$ individuals at random and keeps the fittest; a binary tournament has $k = 2$, a ternary tournament has $k = 3$. In the "non-generational" variant, one individual is replaced at a time rather than rebuilding the whole population each generation. Under this scheme:
 
-- Binary tournament: $E[T] = n H_{n-1}$
-- Ternary tournament: $E[T] = \tfrac{2}{3}\, n H_{n-1}$
+- Binary tournament ($k = 2$): $E[T] = n H_{n-1}$
+- Ternary tournament ($k = 3$): $E[T] = \tfrac{2}{3}\, n H_{n-1}$
 
 where $H_{n-1}$ is the $(n-1)$-th harmonic number ($H_{n-1} \approx \log n$).
 
