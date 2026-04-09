@@ -26,6 +26,8 @@ The plot below sweeps across selection pressure (tournament size) and mutation s
 
 ## The Rastrigin function
 
+<img src="figures/rastrigin_surface.png" alt="The Rastrigin function in two dimensions" width="380" style="float: right; margin: 0 0 1em 1.5em;" />
+
 The Rastrigin function is a standard optimisation test problem because it's **regularly packed with local minima**: it looks like a rippled bowl, where the global best point is the bottom of the bowl, but there are many local dents along the way.
 
 In two dimensions:
@@ -35,8 +37,6 @@ f(x, y) = 20 + (x^2 - 10\cos(2\pi x)) + (y^2 - 10\cos(2\pi y)).
 $$
 
 The global minimum is at $(0,0)$ with $f(0,0) = 0$. Any greedy, hill-climbing algorithm gets stuck. It punishes algorithms that don't explore.
-
-![The Rastrigin function in two dimensions](figures/rastrigin_surface.png)
 
 ## The EA
 
