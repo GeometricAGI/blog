@@ -12,21 +12,15 @@ author:
 
 # Diversity Is All You Need (To Converge)
 
-Evolutionary algorithms are simple. Maintain a population. Evaluate fitness. Keep the best. Mutate to create offspring. Repeat.
+Evolutionary algorithms are simple: maintain a population, evaluate fitness, keep the best, mutate to create offspring, and repeat.
 
 The hard part is **controlling how diverse the population stays as the algorithm runs**. Selection wants to collapse the population into a monoculture. Mutation wants to smear it back out. If you don't manage that tension you either collapse into a local optimum and sit there, or keep "exploring" forever and never cash it in.
 
 We'll build intuition on a multimodal landscape (Rastrigin), then anchor that intuition in **five theoretical results** about convergence speed and how it depends on the exploration/exploitation balance. These results are mostly proved on stylised toy landscapes (bit strings, synthetic traps), because that's where the maths is sharp enough to separate polynomial-time from exponential-time behaviour. The proofs pin down exactly when "keep the best and mutate" is fast, slow, or outright doomed, and the mechanisms transfer to harder problems.
 
-The plot below sweeps across selection pressure (tournament size) and mutation strength ($\sigma$), running the same EA on the Rastrigin function for each combination and recording the best fitness found. Dark cells reached the global optimum; bright cells got stuck. There's a narrow diagonal of good settings; too aggressive on either axis and the algorithm fails in opposite ways.
-
-![Phase diagram: selection pressure vs mutation strength](figures/phase_diagram.png)
-
 ---
 
 ## The Rastrigin function
-
-<img src="figures/rastrigin_surface.png" alt="The Rastrigin function in two dimensions" width="380" style="float: right; margin: 0 0 1em 1.5em;" />
 
 The Rastrigin function is a standard optimisation test problem because it's **regularly packed with local minima**: it looks like a rippled bowl, where the global best point is the bottom of the bowl, but there are many local dents along the way.
 
@@ -36,7 +30,9 @@ $$
 f(x, y) = 20 + (x^2 - 10\cos(2\pi x)) + (y^2 - 10\cos(2\pi y)).
 $$
 
-The global minimum is at $(0,0)$ with $f(0,0) = 0$. Any greedy, hill-climbing algorithm gets stuck. It punishes algorithms that don't explore.
+The global minimum is at $(0,0)$ with $f(0,0) = 0$. Any greedy, hill-climbing algorithm gets stuck, which makes it a good test of whether an optimiser actually explores.
+
+![The Rastrigin function in two dimensions](figures/rastrigin_surface.png)
 
 ## The EA
 
@@ -56,7 +52,7 @@ Tournament selection with size 2 (almost random). Gaussian mutations with $\sigm
 
 ![High diversity, no convergence](figures/diversity_high.gif)
 
-The opposite failure mode. Diversity is maximal, but unstructured: each generation is basically a fresh random sample. Selection isn't strong enough to amplify improvements into a stable lineage, so the algorithm can't compound its gains. This is random search wearing an evolutionary costume.
+This is the opposite failure mode: diversity is maximal, but unstructured, and each generation is basically a fresh random sample. Selection isn't strong enough to amplify improvements into a stable lineage, so the algorithm can't compound its gains. This is random search wearing an evolutionary costume.
 
 ## Balanced diversity
 
@@ -64,9 +60,15 @@ Tournament selection with size 5. Adaptive Gaussian mutations that start large a
 
 ![Balanced diversity, finds global optimum](figures/diversity_balanced.gif)
 
-Early on, large mutations spread the population across the landscape. As the algorithm progresses, mutations shrink, focusing the population on the best basin. The global optimum is found.
+Early on, large mutations spread the population across the landscape, and as the algorithm progresses they shrink, focusing the population on the best basin until the global optimum is found.
 
-Selection *exploits*: it copies what works. Mutation *explores*: it tries something new. The balanced case transitions from broad exploration to focused exploitation. The other two cases get stuck at one extreme.
+Selection *exploits* by copying what works, while mutation *explores* by trying something new. The balanced case transitions from broad exploration to focused exploitation, while the other two cases get stuck at one extreme.
+
+## The full picture
+
+These three runs are points in a larger space. The plot below sweeps across selection pressure (tournament size) and mutation strength ($\sigma$), running the same EA for each combination and recording the best fitness found. Dark cells reached the global optimum; bright cells got stuck. There's a narrow diagonal of good settings; too aggressive on either axis and the algorithm fails in opposite ways.
+
+![Phase diagram: selection pressure vs mutation strength](figures/phase_diagram.png)
 
 ## Seeing it in the numbers
 
@@ -104,11 +106,11 @@ Second, a positive result: adding **elitism** (always preserving the best soluti
 
 ![Markov chain: without vs with elitism](figures/markov_chain.png)
 
-The conditions are mild. Elitism is a one-line code change. Gaussian mutation is ergodic by construction. But the theorem says nothing about how long convergence takes. It could be exponential. That's exactly what the Rastrigin GIFs demonstrate: elitism is on in all three runs, but only the balanced one is fast in any practical sense.
+The conditions are mild (elitism is a one-line code change, and Gaussian mutation is ergodic by construction), but the theorem says nothing about how long convergence takes, and it could easily be exponential. That's exactly what the Rastrigin GIFs demonstrate: elitism is on in all three runs, but only the balanced one is fast in any practical sense.
 
 ### 2. Selection pressure has a closed-form "diversity half-life"
 
-Selection pressure can be made precise. The classic measure is **takeover time**: the expected number of selection iterations needed until the population consists entirely of copies of the initially-best individual (assuming it can't go extinct).
+Selection pressure can be made precise, and the classic measure is **takeover time**: the expected number of selection iterations needed until the population consists entirely of copies of the initially-best individual (assuming it can't go extinct).
 
 [Rudolph (2000)](https://dl.acm.org/doi/10.5555/2933718.2933888) proved closed-form expressions for non-generational tournament selection with population size $n$:
 
@@ -134,9 +136,9 @@ The mutation probability $p$ in standard bitwise mutation has a sharp threshold,
 
 ![Mutation rate phase transition: e^c/c curve](figures/mutation_phase_transition.png)
 
-Two takeaways. First, **there is an "exploration too high" regime where progress becomes provably inefficient**. When $p$ is much bigger than $(\ln n)/n$, each mutation flips so many bits that improvements become too rare. Second, **the "right" amount of exploration is quantifiable**: the optimum occurs when the expected number of flipped bits per mutation is about 1.
+There are two takeaways: first, **there is an "exploration too high" regime where progress becomes provably inefficient**, because when $p$ is much bigger than $(\ln n)/n$ each mutation flips so many bits that improvements become too rare; and second, **the "right" amount of exploration is quantifiable**, with the optimum occurring when the expected number of flipped bits per mutation is about 1.
 
-This is the discrete analogue of the Rastrigin knobs. If $\sigma$ is huge, you're effectively resampling. If $\sigma$ is tiny, you can't move between basins. And there's a middle regime where the EA has a provable positive drift.
+This is the discrete analogue of the Rastrigin knobs: if $\sigma$ is huge you're effectively resampling, if it's tiny you can't move between basins, and there's a middle regime where the EA has a provable positive drift.
 
 ### 4. Diversity plus crossover can change the exponent
 
@@ -194,9 +196,7 @@ The recipe:
 
 ## The point
 
-Evolutionary algorithms are not random search. They have provable convergence guarantees. But those guarantees are vacuous without diversity management.
-
-Too little diversity: stuck. Too much: lost. The science is in controlling the transition from exploration to exploitation as the algorithm runs.
+Evolutionary algorithms are not random search, and they have provable convergence guarantees, but those guarantees are vacuous without diversity management. Too little diversity and you're stuck; too much and you're lost. The science is in controlling the transition from exploration to exploitation as the algorithm runs.
 
 ---
 
