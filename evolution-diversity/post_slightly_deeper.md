@@ -14,7 +14,7 @@ author:
 
 Evolutionary algorithms are simple. Maintain a population. Evaluate fitness. Keep the best. Mutate to create offspring. Repeat.
 
-But the loop isn't the hard part. **Controlling how diverse the population stays as the algorithm runs** is the hard part. Selection wants to collapse the population into a monoculture. Mutation wants to smear it back out. If you don't manage that tension you either collapse into a local optimum and sit there, or keep "exploring" forever and never cash it in.
+The hard part is **controlling how diverse the population stays as the algorithm runs**. Selection wants to collapse the population into a monoculture. Mutation wants to smear it back out. If you don't manage that tension you either collapse into a local optimum and sit there, or keep "exploring" forever and never cash it in.
 
 We'll build intuition on a multimodal landscape (Rastrigin), then anchor that intuition in **five theoretical results** about convergence speed and how it depends on the exploration/exploitation balance. These results are mostly proved on stylised toy landscapes (bit strings, synthetic traps), because that's where the maths is sharp enough to separate polynomial-time from exponential-time behaviour. The proofs pin down exactly when "keep the best and mutate" is fast, slow, or outright doomed, and the mechanisms transfer to harder problems.
 
@@ -70,7 +70,7 @@ Selection *exploits*: it copies what works. Mutation *explores*: it tries someth
 
 ## Seeing it in the numbers
 
-The GIFs show the spatial story. The time-series below shows the quantitative story: best fitness and population diversity (average pairwise distance) over generations, for all three regimes side by side.
+The time-series below plot best fitness and population diversity (average pairwise distance) over generations for all three regimes.
 
 ![Time series: best fitness and diversity for all three regimes](figures/time_series.png)
 
@@ -108,11 +108,9 @@ The conditions are mild. Elitism is a one-line code change. Gaussian mutation is
 
 ### 2. Selection pressure has a closed-form "diversity half-life"
 
-A lot of blog posts treat selection pressure as vibes. The runtime literature treats it as a number.
+Selection pressure can be made precise. The classic measure is **takeover time**: the expected number of selection iterations needed until the population consists entirely of copies of the initially-best individual (assuming it can't go extinct).
 
-The classic measure is **takeover time**: the expected number of selection iterations needed until the population consists entirely of copies of the initially-best individual (assuming it can't go extinct).
-
-[Rudolph (2000)](https://link.springer.com/chapter/10.1007/978-3-662-04448-3_63) proved closed-form expressions for non-generational tournament selection with population size $n$:
+[Rudolph (2000)](https://dl.acm.org/doi/10.5555/2933718.2933888) proved closed-form expressions for non-generational tournament selection with population size $n$:
 
 - Binary tournament: $E[T] = n H_{n-1}$
 - Ternary tournament: $E[T] = \tfrac{2}{3}\, n H_{n-1}$
@@ -127,9 +125,9 @@ Once takeover happens, crossover starts recombining near-clones and mutation bec
 
 ### 3. Mutation rate has a phase transition
 
-The mutation probability $p$ in standard bitwise mutation is one of the most thoroughly studied parameters in the field. Even on extremely friendly landscapes (linear functions), there is a sharp threshold.
+The mutation probability $p$ in standard bitwise mutation has a sharp threshold, even on simple landscapes like linear functions.
 
-[Witt (2013)](https://doi.org/10.1007/s00453-012-9619-x) proved tight bounds for the $(1+1)$ EA on any linear function:
+[Witt (2013)](https://doi.org/10.1017/S0963548312000600) proved tight bounds for the $(1+1)$ EA on any linear function:
 
 - If $p = \omega((\ln n)/n)$, the expected optimisation time is superpolynomial.
 - If $p = c/n$ for constant $c > 0$, then $E[T] = (1 \pm o(1)) \frac{e^c}{c}\, n \ln n$, and the asymptotic optimum is at $p \approx 1/n$.
@@ -142,7 +140,7 @@ This is the discrete analogue of the Rastrigin knobs. If $\sigma$ is huge, you'r
 
 ### 4. Diversity plus crossover can change the exponent
 
-Local optima are where "diversity management" stops being a slogan and starts being a runtime bound.
+Local optima are where diversity management has the sharpest effect on runtime.
 
 The standard theoretical trap is the $\text{Jump}_k$ function: there is a broad plateau of local optima a Hamming distance $k$ away from the unique global optimum. Mutation-only algorithms must "jump" the gap by flipping the right $k$ bits in one lucky step.
 
@@ -162,7 +160,7 @@ The Rastrigin "balanced" run used a hand-designed decay schedule for $\sigma(t)$
 
 Try a slightly bigger step and a slightly smaller step, then keep whichever produced the best offspring. Exploration and exploitation applied to the parameter choice itself, not just the search point.
 
-[Doerr, Giessen, and Witt (2019)](https://doi.org/10.1007/s00453-018-0502-x) proved that a $(1+\lambda)$ EA with this self-adjusting mutation rate finds the optimum on OneMax in $O(n\lambda / \log \lambda + n \log n)$ expected evaluations, asymptotically improving over the classic fixed-rate $(1+\lambda)$ EA.
+[Doerr, Gießen, Witt, and Yang (2019)](https://doi.org/10.1007/s00453-018-0502-x) proved that a $(1+\lambda)$ EA with this self-adjusting mutation rate finds the optimum on OneMax in $O(n\lambda / \log \lambda + n \log n)$ expected evaluations, asymptotically improving over the classic fixed-rate $(1+\lambda)$ EA.
 
 ![Self-adjusting mutation rate on OneMax](figures/self_adjusting_onemax.png)
 
@@ -212,13 +210,13 @@ Too little diversity: stuck. Too much: lost. The science is in controlling the t
 
 3. D.E. Goldberg and K. Deb. *A Comparative Analysis of Selection Schemes Used in Genetic Algorithms.* Foundations of Genetic Algorithms, 1:69-93, 1991.
 
-4. C. Witt. *Tight Bounds on the Optimization Time of a Randomized Search Heuristic on Linear Functions.* Combinatorics, Probability and Computing, 22(2):294-318, 2013. [doi:10.1007/s00453-012-9619-x](https://doi.org/10.1007/s00453-012-9619-x)
+4. C. Witt. *Tight Bounds on the Optimization Time of a Randomized Search Heuristic on Linear Functions.* Combinatorics, Probability and Computing, 22(2):294-318, 2013. [doi:10.1017/S0963548312000600](https://doi.org/10.1017/S0963548312000600)
 
 5. D.-C. Dang, T. Friedrich, M. Kötzing, M.S. Krejca, P.K. Lehre, P.S. Oliveto, D. Sudholt, A.M. Sutton. *Escaping Local Optima with Diversity Mechanisms and Crossover.* GECCO 2016, pp. 645-652. [doi:10.1145/2908812.2908956](https://doi.org/10.1145/2908812.2908956)
 
 6. D.-C. Dang, T. Friedrich, M. Kötzing, M.S. Krejca, P.K. Lehre, P.S. Oliveto, D. Sudholt, A.M. Sutton. *Escaping Local Optima using Crossover with Emergent Diversity.* IEEE Transactions on Evolutionary Computation, 22(3):484-497, 2018. [doi:10.1109/TEVC.2017.2724201](https://doi.org/10.1109/TEVC.2017.2724201)
 
-7. B. Doerr, C. Giessen, C. Witt. *The (1+λ) Evolutionary Algorithm with Self-Adjusting Mutation Rate.* Algorithmica, 81:593-631, 2019. [doi:10.1007/s00453-018-0502-x](https://doi.org/10.1007/s00453-018-0502-x)
+7. B. Doerr, C. Gießen, C. Witt, J. Yang. *The (1+λ) Evolutionary Algorithm with Self-Adjusting Mutation Rate.* Algorithmica, 81:593-631, 2019. [doi:10.1007/s00453-018-0502-x](https://doi.org/10.1007/s00453-018-0502-x)
 
 8. D. Sudholt. *The Benefits of Population Diversity in Evolutionary Algorithms: A Survey of Rigorous Runtime Analyses.* arXiv:1801.10087, 2018.
 
