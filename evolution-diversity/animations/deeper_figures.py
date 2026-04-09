@@ -619,6 +619,42 @@ def make_crossover_cartoon(save_path):
 
 
 # =====================================================================
+# Figure 8: Rastrigin surface plot
+# =====================================================================
+
+def make_rastrigin_surface(save_path):
+    bound = 5.12
+    res = 300
+    x_lin = np.linspace(-bound, bound, res)
+    y_lin = np.linspace(-bound, bound, res)
+    X, Y = np.meshgrid(x_lin, y_lin)
+    Z = rastrigin(X, Y)
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    im = ax.pcolormesh(X, Y, Z, cmap="inferno", shading="auto")
+    ax.plot(0, 0, "*", color=ACCENT_BLUE, markersize=14, zorder=10,
+            markeredgecolor="white", markeredgewidth=0.8)
+    ax.text(0.3, 0.3, "Global minimum", color=ACCENT_BLUE, fontsize=10,
+            fontweight="bold")
+
+    cbar = fig.colorbar(im, ax=ax, pad=0.02)
+    cbar.set_label("f(x, y)", color=TEXT_COLOR)
+    cbar.ax.yaxis.set_tick_params(color=TEXT_COLOR)
+    plt.setp(cbar.ax.yaxis.get_ticklabels(), color=TEXT_COLOR)
+
+    ax.set_xlabel("x", fontsize=12)
+    ax.set_ylabel("y", fontsize=12)
+    ax.set_title("Rastrigin Function", fontsize=13, fontweight="bold",
+                 color="white")
+    ax.set_aspect("equal")
+
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {save_path}")
+
+
+# =====================================================================
 # Main
 # =====================================================================
 
@@ -636,6 +672,7 @@ if __name__ == "__main__":
     make_self_adjusting_onemax(figures / "self_adjusting_onemax.png")
     make_markov_chain(figures / "markov_chain.png")
     make_crossover_cartoon(figures / "crossover_cartoon.png")
+    make_rastrigin_surface(figures / "rastrigin_surface.png")
 
     print()
     print("Done! All figures saved to:", figures)
