@@ -133,9 +133,13 @@ Once takeover happens, crossover starts recombining near-clones and mutation bec
 
 In standard bitwise mutation, each bit in the solution string is flipped independently with probability $p$. [Witt (2013)](https://doi.org/10.1017/S0963548312000600) proved tight bounds for the $(1+1)$ EA (the simplest elitist EA: keep one solution, produce one mutant, keep whichever is better) on any linear function over bit strings of length $n$.
 
-If you set $p = c/n$ so that you flip $c$ bits per step on average, the expected runtime has a leading constant of $e^c/c$. This is minimised at $c = 1$ (i.e. $p = 1/n$, flipping about one bit per step), where the expected runtime is $\approx e \cdot n \ln n$. Moving away from $c = 1$ in either direction makes the runtime worse, and the penalty grows rapidly: at $c = 3$ the leading constant is already $\approx 6.7$ compared to $\approx 2.7$ at the optimum.
+If you set $p = c/n$ so that you flip $c$ bits per step on average, the expected runtime is $\approx \frac{e^c}{c} n \ln n$. This is minimised at $c = 1$ (i.e. $p = 1/n$, flipping about one bit per step), where it evaluates to $\approx e \cdot n \ln n$. The leading constant $e^c/c$ grows rapidly as you increase $c$: at $c = 3$ it's already $\approx 6.7$ compared to $\approx 2.7$ at the optimum.
 
 ![Runtime vs mutation rate: e^c/c curve](figures/mutation_phase_transition.png)
+
+The result above holds when $c$ is a fixed number. But you can also ask: what if I let $c$ grow with problem size, flipping more bits on larger problems? Witt showed that as long as the expected number of flipped bits stays below $O(\ln n)$, the runtime is still polynomial in $n$. Beyond that, it becomes superpolynomial, meaning it grows faster than $n^k$ for any fixed $k$. This is the same polynomial-vs-superpolynomial distinction that comes up in the next section.
+
+(A note on what "polynomial in $n$" means here: these results study how runtime scales across problems of different sizes. For any single problem, $n$ is fixed and the runtime is just a number. The value of the scaling analysis is that it tells you which strategies will remain feasible as problems get bigger, and which ones will hit a wall.)
 
 This is the discrete analogue of the Rastrigin knobs. If you flip too many bits per step, you destroy good solutions faster than selection can exploit them. If you flip too few, you can't escape local optima. The optimum is in between, and the $e^c/c$ curve quantifies the cost of getting it wrong.
 
