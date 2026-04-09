@@ -239,13 +239,15 @@ def make_takeover_curves(save_path):
             fracs = [1.0 / pop_size]
 
             for step in range(1, max_steps + 1):
-                # Pick one slot to replace via tournament
-                slot = rng.integers(pop_size)
+                # Tournament selects a winner; winner replaces a random
+                # non-winner from the tournament (monotonic: best type
+                # can only spread, never be lost).
                 candidates = rng.choice(pop_size, min(ts, pop_size), replace=False)
                 if np.any(types[candidates] == 1):
-                    types[slot] = 1
-                else:
-                    types[slot] = 0
+                    # Best type wins; replace a non-best candidate if any
+                    losers = candidates[types[candidates] == 0]
+                    if len(losers) > 0:
+                        types[rng.choice(losers)] = 1
                 if step % record_every == 0:
                     fracs.append(np.mean(types == 1))
 
@@ -260,7 +262,7 @@ def make_takeover_curves(save_path):
 
     ax.axvline(theo_binary, color=ACCENT_BLUE, linestyle=":", alpha=0.7)
     ax.text(theo_binary + max_steps * 0.02, 0.45,
-            f"E[T] = {theo_binary:.0f}\n(k=2, theory)",
+            f"E[T] = nH_{{n-1}} ≈ {theo_binary:.0f}\n(k=2, n={pop_size})",
             color=ACCENT_BLUE, fontsize=9)
 
     ax.set_xlabel("Selection events (steady-state, no mutation)", fontsize=12)
