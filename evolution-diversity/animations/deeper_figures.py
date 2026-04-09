@@ -216,11 +216,15 @@ def make_time_series(save_path):
 # =====================================================================
 
 def make_takeover_curves(save_path):
-    pop_size = 30
-    max_iters = 300
+    pop_size = 100
     n_trials = 200
     tournament_sizes = [2, 3, 5, 10]
     colors = [ACCENT_BLUE, ACCENT_GREEN, ACCENT_ORANGE, ACCENT_RED]
+
+    # Theoretical takeover time for binary tournament (upper bound for x-axis)
+    H = sum(1.0 / k for k in range(1, pop_size))
+    theo_binary = pop_size * H
+    max_steps = int(theo_binary * 1.5)
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
@@ -228,47 +232,43 @@ def make_takeover_curves(save_path):
         fraction_curves = []
         for trial in range(n_trials):
             rng = np.random.default_rng(trial)
-            # Track how many copies of the "best" type exist
-            # Start with 1 best individual out of pop_size
+            # Steady-state (non-generational): one replacement per step
             types = np.zeros(pop_size, dtype=int)
-            types[0] = 1  # individual 0 is "best"
+            types[0] = 1
+            record_every = max(1, max_steps // 500)
             fracs = [1.0 / pop_size]
 
-            for it in range(max_iters):
-                new_types = np.empty_like(types)
-                for j in range(pop_size):
-                    candidates = rng.choice(pop_size, min(ts, pop_size), replace=False)
-                    # Best type (1) wins tournament
-                    if np.any(types[candidates] == 1):
-                        new_types[j] = 1
-                    else:
-                        new_types[j] = 0
-                types = new_types
-                fracs.append(np.mean(types == 1))
-                if np.all(types == 1):
-                    # Pad rest with 1.0
-                    fracs.extend([1.0] * (max_iters - it - 1))
-                    break
+            for step in range(1, max_steps + 1):
+                # Pick one slot to replace via tournament
+                slot = rng.integers(pop_size)
+                candidates = rng.choice(pop_size, min(ts, pop_size), replace=False)
+                if np.any(types[candidates] == 1):
+                    types[slot] = 1
+                else:
+                    types[slot] = 0
+                if step % record_every == 0:
+                    fracs.append(np.mean(types == 1))
 
-            fraction_curves.append(fracs[:max_iters + 1])
+            fraction_curves.append(fracs)
 
+        # Align lengths
+        min_len = min(len(f) for f in fraction_curves)
+        fraction_curves = [f[:min_len] for f in fraction_curves]
         mean_frac = np.mean(fraction_curves, axis=0)
-        ax.plot(range(len(mean_frac)), mean_frac, color=color, linewidth=2,
-                label=f"Tournament size {ts}")
+        x_vals = np.arange(min_len) * record_every
+        ax.plot(x_vals, mean_frac, color=color, linewidth=2, label=f"k = {ts}")
 
-    # Theoretical takeover time for binary tournament: n * H_{n-1}
-    H = sum(1.0 / k for k in range(1, pop_size))
-    theo_binary = pop_size * H
     ax.axvline(theo_binary, color=ACCENT_BLUE, linestyle=":", alpha=0.7)
-    ax.text(theo_binary + 2, 0.5, f"E[T]={theo_binary:.0f}\n(binary, theory)",
+    ax.text(theo_binary + max_steps * 0.02, 0.45,
+            f"E[T] = {theo_binary:.0f}\n(k=2, theory)",
             color=ACCENT_BLUE, fontsize=9)
 
-    ax.set_xlabel("Selection iterations (no mutation)", fontsize=12)
-    ax.set_ylabel("Fraction of 'best' type in population", fontsize=12)
-    ax.set_title("Takeover Dynamics by Tournament Size", fontsize=13,
+    ax.set_xlabel("Selection events (steady-state, no mutation)", fontsize=12)
+    ax.set_ylabel("Fraction of population that is the 'best' type", fontsize=12)
+    ax.set_title("Takeover Dynamics (population size 100)", fontsize=13,
                  fontweight="bold", color="white")
     ax.legend(facecolor=PANEL_BG, edgecolor=GRID_COLOR, fontsize=10)
-    ax.set_xlim(0, 200)
+    ax.set_xlim(0, max_steps)
     ax.grid(True)
 
     fig.tight_layout()
