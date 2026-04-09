@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Diversity Is All You Need (To Converge)"
+title: "Diversity Is All You Need (To Converge): Why Evolutionary Algorithms Need Diversity Management"
 date: 2026-04-07
 author:
   name: Jack Foxabbott
@@ -10,7 +10,7 @@ author:
 
 *By [Jack Foxabbott](https://www.linkedin.com/in/foxabbott/), Founding Member of Technical Staff*
 
-# Diversity Is All You Need (To Converge)
+# Diversity Is All You Need (To Converge): Why Evolutionary Algorithms Need Diversity Management
 
 Evolutionary algorithms are simple: maintain a population, evaluate fitness, keep the best, mutate to create offspring, and repeat.
 
@@ -98,11 +98,13 @@ A good diversity strategy doesn't maximise diversity. It makes sure the escape c
 
 ## Five theoretical results about convergence speed
 
-Below are five results that make the intuition above precise. Most are proved for bit-string EAs, because that's where you can cleanly separate polynomial from exponential runtime.
+The Rastrigin experiments and the two-clocks framing give intuition, but they don't tell us *why* one setting works and another doesn't, or how to predict what will happen on a new problem. For that we need theory.
+
+The results below come from a branch of research called **runtime analysis**, which studies evolutionary algorithms the way complexity theory studies classical algorithms: by proving bounds on how many fitness evaluations an EA needs to find the optimum, as a function of problem size. The key question is whether that number is **polynomial** (feasible, scales reasonably) or **superpolynomial/exponential** (infeasible, blows up). Most of these results are proved for EAs operating on bit strings, because that's a setting where the maths is tractable enough to get clean answers.
 
 ### 1. Elitism gives convergence, but not speed
 
-[Rudolph (1994)](https://doi.org/10.1109/72.265964) used Markov chain analysis to prove two things about canonical genetic algorithms.
+The most fundamental question is: does the algorithm even converge to the global optimum? [Rudolph (1994)](https://doi.org/10.1109/72.265964) used Markov chain analysis to prove two things about canonical genetic algorithms.
 
 First, a negative result: without elitism, the standard GA **never** converges to the global optimum, regardless of initialisation, crossover operator, or objective function. The population's state space is ergodic: it visits optimal states infinitely often but leaves them infinitely often. There are no absorbing states.
 
