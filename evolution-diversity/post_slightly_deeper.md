@@ -131,18 +131,13 @@ Once takeover happens, crossover starts recombining near-clones and mutation bec
 
 ### 3. Mutation rate has a phase transition
 
-In standard bitwise mutation, each bit in the solution string is flipped independently with probability $p$. This $p$ has a sharp threshold, even on simple landscapes like linear functions.
+In standard bitwise mutation, each bit in the solution string is flipped independently with probability $p$. [Witt (2013)](https://doi.org/10.1017/S0963548312000600) proved tight bounds for the $(1+1)$ EA (the simplest elitist EA: keep one solution, produce one mutant, keep whichever is better) on any linear function over bit strings of length $n$.
 
-[Witt (2013)](https://doi.org/10.1017/S0963548312000600) proved tight bounds for the $(1+1)$ EA (the simplest elitist EA: keep one solution, produce one mutant, keep whichever is better) on any linear function:
+If you set $p = c/n$ so that you flip $c$ bits per step on average, the expected runtime has a leading constant of $e^c/c$. This is minimised at $c = 1$ (i.e. $p = 1/n$, flipping about one bit per step), where the expected runtime is $\approx e \cdot n \ln n$. Moving away from $c = 1$ in either direction makes the runtime worse, and the penalty grows rapidly: at $c = 3$ the leading constant is already $\approx 6.7$ compared to $\approx 2.7$ at the optimum.
 
-- If the mutation rate $p$ grows faster than $(\ln n)/n$ (where $n$ is the bit-string length), too many bits flip per step and the expected time to find the optimum becomes superpolynomial.
-- If $p = c/n$ for a constant $c > 0$, so that roughly one bit flips per step on average, the expected time is $E[T] = (1 \pm o(1)) \frac{e^c}{c} n \ln n$, which is polynomial. The best constant is $c \approx 1$, i.e. $p \approx 1/n$.
+![Runtime vs mutation rate: e^c/c curve](figures/mutation_phase_transition.png)
 
-![Mutation rate phase transition: e^c/c curve](figures/mutation_phase_transition.png)
-
-There are two takeaways: first, **there is an "exploration too high" regime where progress becomes provably inefficient**, because when $p$ is much bigger than $(\ln n)/n$ each mutation flips so many bits that improvements become too rare; and second, **the "right" amount of exploration is quantifiable**, with the optimum occurring when the expected number of flipped bits per mutation is about 1.
-
-This is the discrete analogue of the Rastrigin knobs: if $\sigma$ is huge you're effectively resampling, if it's tiny you can't move between basins, and there's a middle regime where the EA has a provable positive drift.
+This is the discrete analogue of the Rastrigin knobs. If you flip too many bits per step, you destroy good solutions faster than selection can exploit them. If you flip too few, you can't escape local optima. The optimum is in between, and the $e^c/c$ curve quantifies the cost of getting it wrong.
 
 ### 4. Diversity plus crossover can change the exponent
 
