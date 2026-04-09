@@ -137,7 +137,7 @@ If you set $p = c/n$ so that you flip $c$ bits per step on average, the expected
 
 ![Runtime vs mutation rate: e^c/c curve](figures/mutation_phase_transition.png)
 
-The result above holds when $c$ is a fixed number. But you can also ask: what if I let $c$ grow with problem size, flipping more bits on larger problems? Witt showed that as long as the expected number of flipped bits stays below $O(\ln n)$, the runtime is still polynomial in $n$. Beyond that, it becomes superpolynomial, meaning it grows faster than $n^k$ for any fixed $k$. This is the same polynomial-vs-superpolynomial distinction that comes up in the next section.
+The result above holds when $c$ is a fixed number. But you can also ask: what if I let $c$ grow with problem size, flipping more bits on larger problems? Witt showed that as long as the expected number of flipped bits stays below $O(\ln n)$, the runtime is still polynomial in $n$. Beyond that, it becomes superpolynomial, meaning it grows faster than $n^k$ for any fixed $k$.
 
 (A note on what "polynomial in $n$" means here: these results study how runtime scales across problems of different sizes. For any single problem, $n$ is fixed and the runtime is just a number. The value of the scaling analysis is that it tells you which strategies will remain feasible as problems get bigger, and which ones will hit a wall.)
 
@@ -147,9 +147,9 @@ This is the discrete analogue of the Rastrigin knobs. If you flip too many bits 
 
 Local optima are where diversity management has the sharpest effect on runtime.
 
-The standard theoretical trap is the $\text{Jump}_k$ function: there is a broad plateau of local optima a Hamming distance $k$ away from the unique global optimum. Mutation-only algorithms must "jump" the gap by flipping the right $k$ bits in one lucky step.
+A clean example is the $\text{Jump}_k$ function, a synthetic benchmark designed to test exactly this. It rewards solutions for having more 1-bits, except for a "gap" of width $k$ just below the optimum (the all-ones string). Solutions in the gap have artificially bad fitness, so the EA gets stuck on the edge of the gap, $k$ bits away from the optimum. The only way for a mutation-only algorithm to cross it is to flip the right $k$ bits in a single step.
 
-[Dang, Friedrich, Kötzing, Krejca, Lehre, Oliveto, Sudholt, and Sutton (2016)](https://doi.org/10.1145/2908812.2908956) proved that a mutation-only $(1+1)$ EA needs $\Theta(n^k)$ fitness evaluations. But a population-based GA with crossover and diversity mechanisms solves the same problem in $O(n \log n)$. Not "10% faster", but a completely different scaling law.
+[Dang, Friedrich, Kötzing, Krejca, Lehre, Oliveto, Sudholt, and Sutton (2016)](https://doi.org/10.1145/2908812.2908956) proved that a mutation-only $(1+1)$ EA needs $\Theta(n^k)$ fitness evaluations. But a population-based GA with crossover and diversity mechanisms solves the same problem in $O(n \log n)$, which is a completely different scaling law.
 
 ![Crossover with diverse vs identical parents](figures/crossover_cartoon.png)
 
@@ -165,7 +165,7 @@ The Rastrigin "balanced" run used a hand-designed decay schedule for $\sigma(t)$
 
 Try a slightly bigger step and a slightly smaller step, then keep whichever produced the best offspring. Exploration and exploitation applied to the parameter choice itself, not just the search point.
 
-[Doerr, Gießen, Witt, and Yang (2019)](https://doi.org/10.1007/s00453-018-0502-x) proved that a $(1+\lambda)$ EA with this self-adjusting mutation rate finds the optimum on OneMax in $O(n\lambda / \log \lambda + n \log n)$ expected evaluations, asymptotically improving over the classic fixed-rate $(1+\lambda)$ EA.
+[Doerr, Gießen, Witt, and Yang (2019)](https://doi.org/10.1007/s00453-018-0502-x) proved that a $(1+\lambda)$ EA with this self-adjusting mutation rate finds the optimum on OneMax (the simplest benchmark: maximise the number of 1-bits in a bit string) in $O(n\lambda / \log \lambda + n \log n)$ expected evaluations, asymptotically improving over the classic fixed-rate $(1+\lambda)$ EA.
 
 ![Self-adjusting mutation rate on OneMax](figures/self_adjusting_onemax.png)
 
@@ -177,23 +177,23 @@ In practice: when progress is possible with small perturbations, the process dri
 
 The Rastrigin GIFs are continuous and the theorems above are mostly discrete, but the lesson transfers because the failure modes are the same.
 
-| Scenario | Elitism | Ergodicity | Selection | Diversity | Outcome |
-|----------|---------|------------|-----------|-----------|---------|
-| Too little | Yes | Technically, but $\sigma$ too small | Very strong | Collapsed | Local optimum |
-| Too much | Yes | Yes | Too weak | Maximal, unstructured | Random walk |
-| Balanced | Yes | Yes | Moderate | Controlled, decaying | Global optimum |
+| Scenario | Elitism | Ergodicity | Selection | Outcome |
+|----------|---------|------------|-----------|---------|
+| Too little diversity | Yes | Technically, but $\sigma$ too small | Very strong | Local optimum |
+| Too much diversity | Yes | Yes | Too weak | Random walk |
+| Balanced diversity | Yes | Yes | Moderate | Global optimum |
 
-**Too little diversity.** High selection pressure reduces the takeover time (fast exploitation), so diversity collapses early. The takeover curves make this precise: even without mutation, tournament selection fills the population with copies in $\Theta(n \log n)$ iterations, with constants that improve (speed up collapse) as you increase tournament size. Rudolph's convergence conditions are technically met (Gaussian noise is ergodic, elitism is on), so convergence is guaranteed, eventually. But Dang et al. tells us why "eventually" is useless: the population has collapsed to a single basin, so escaping the local optimum requires an exponentially unlikely mutation.
+**Too little diversity.** Rudolph's convergence conditions are met (elitism is on, Gaussian noise is ergodic), so convergence is guaranteed in theory. But the takeover curves show why it's useless in practice: strong selection collapses the population in $\Theta(n \log n)$ iterations, and once diversity is gone, escaping the local optimum requires an exponentially unlikely mutation (Dang et al.).
 
-**Too much diversity.** Weak selection keeps diversity but starves exploitation. The population doesn't "remember" discoveries long enough for local search to compound them, so you get random walk behaviour on a rugged landscape.
+**Too much diversity.** Weak selection can't compound improvements, so the population wanders without exploiting what it finds.
 
-**Balanced.** The population starts diverse (enabling the polynomial escape time that Dang et al. proved) and gradually focuses. Both Rudolph's convergence conditions and Dang et al.'s diversity conditions are satisfied. The self-adjusting mutation theory (Doerr et al.) explains *why* the decaying schedule works: it approximates the data-driven parameter control that is provably near-optimal.
+**Balanced.** The population starts diverse (enabling the polynomial escape time from Dang et al.) and gradually focuses as the mutation schedule decays (approximating the self-adjusting strategy from Doerr et al.).
 
 The recipe:
 
 - Use elitism so "discovering the best-so-far" is sticky.
 - Keep selection pressure moderate so takeover doesn't annihilate diversity immediately.
-- Pick exploration strength that is big enough to escape basins early, but small enough to avoid destroying structure late.
+- Set mutation strength near the optimum ($c \approx 1$ in the discrete case, or the equivalent $\sigma$ in continuous problems), since the runtime cost of overshooting grows rapidly.
 - If you have recombination, make sure the population stays meaningfully diverse. Otherwise crossover is provably wasted on difficult landscapes.
 - Prefer adaptive schemes when you can, because simple self-adjustment can track near-optimal settings on the fly.
 
