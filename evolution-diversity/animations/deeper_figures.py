@@ -300,15 +300,14 @@ def make_mutation_phase_transition(save_path):
                 color=ACCENT_GREEN, fontsize=10, fontweight="bold",
                 arrowprops=dict(arrowstyle="->", color=ACCENT_GREEN, lw=1.5))
 
-    # Mark phase transition region
-    c_thresh = np.log(50)  # ln(n) for n=50 as illustration
-    ax.axvspan(c_thresh, 5.0, alpha=0.15, color=ACCENT_RED)
-    ax.text(4.2, 15, "Superpolynomial\nregime", color=ACCENT_RED,
-            fontsize=10, fontweight="bold", ha="center")
+    # Note: the formula E[T] ~ (e^c/c) n ln n holds for constant c,
+    # i.e. p = c/n. Beyond p = (ln n)/n the runtime becomes
+    # superpolynomial, but that threshold depends on n so we don't
+    # shade a fixed region on this plot.
 
     ax.set_xlabel("c  (mutation rate p = c/n)", fontsize=12)
-    ax.set_ylabel("Leading constant  e$^c$/c  in runtime", fontsize=12)
-    ax.set_title("Mutation Rate Phase Transition (Witt, 2013)", fontsize=13,
+    ax.set_ylabel("Leading constant  e$^c$/c  in E[T]", fontsize=12)
+    ax.set_title("Runtime vs Mutation Rate (Witt, 2013)", fontsize=13,
                  fontweight="bold", color="white")
     ax.set_ylim(0, 35)
     ax.grid(True)
