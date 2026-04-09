@@ -127,7 +127,7 @@ where $H_{n-1}$ is the $(n-1)$-th harmonic number ($H_{n-1} \approx \log n$).
 
 ![Takeover curves for different tournament sizes](figures/takeover_curves.png)
 
-Once takeover happens, crossover starts recombining near-clones and mutation becomes the only source of novelty. At that point you're effectively running a hillclimber with a particular step size distribution, often exactly the "too little diversity" regime from the Rastrigin demo.
+Once takeover happens, crossover starts recombining near-clones and mutation becomes the only source of novelty. At that point you're effectively running a hillclimber with a particular step size distribution, often exactly the "too little diversity" regime from the Rastrigin experiments.
 
 ### 3. Mutation rate has a phase transition
 
@@ -173,7 +173,7 @@ In practice: when progress is possible with small perturbations, the process dri
 
 ---
 
-## Mapping the demo to the theory
+## Mapping the Rastrigin experiments to the theory
 
 The Rastrigin GIFs are continuous and the theorems above are mostly discrete, but the lesson transfers because the failure modes are the same.
 
