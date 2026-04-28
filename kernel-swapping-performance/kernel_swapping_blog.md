@@ -20,6 +20,7 @@ _The results shown in this blog are based on running the model and kernel on an 
 
 ## Setup
 
+
 ```python
 import torch
 import torch.nn as nn
@@ -45,14 +46,11 @@ if torch.cuda.is_available():
 
 ```
 
-```
-/workspace/blog/kernel-swapping-performance/.venv/lib/python3.11/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
-Device : cuda
-PyTorch: 2.11.0+cu130
-GPU    : NVIDIA GeForce RTX 5060 Ti
-VRAM   : 16.6 GB
-```
+    Device : cuda
+    PyTorch: 2.11.0+cu130
+    GPU    : NVIDIA H100 80GB HBM3
+    VRAM   : 85.0 GB
+
 
 ---
 
@@ -65,6 +63,7 @@ $$\text{RMSNorm}(\mathbf{x}) = \frac{\mathbf{x}}{\text{RMS}(\mathbf{x})} \cdot \
 Unlike LayerNorm, RMSNorm skips the mean-subtraction step, making it cheaper to compute.
 
 The implementation of [RMSNorm](https://github.com/huggingface/transformers/blob/0db33792ed1cc6a61d96f5d59fd0c930db2896fe/src/transformers/models/qwen3/modeling_qwen3.py#L50) in Hugging Face's `transformers` library for the Qwen3 model is shown below:
+
 
 ```python
 class Qwen3RMSNorm(nn.Module):
@@ -91,6 +90,7 @@ class Qwen3RMSNorm(nn.Module):
 
 [Liger-Kernel](https://github.com/linkedin/Liger-Kernel) ships fused Triton replacements for standard Transformer ops. These triton kernels are supposed to deliver better speed and/or memory efficiency. We import `LigerRMSNormFunction` directly and use it as a drop-in for `Qwen3RMSNorm.forward`:
 
+
 ```python
 liger_kernel_rmsnorm = LigerRMSNormFunction.apply
 ```
@@ -101,6 +101,7 @@ liger_kernel_rmsnorm = LigerRMSNormFunction.apply
 The standard way to validate a custom kernel is to compare its outputs against a reference implementation on random inputs, within some numerical tolerance. This is the test that would appear in a kernel's CI suite. It's nearly impossible to get bitwise identical outputs from two different implementations of the same operation because floating point arithmetic is not associative. i.e. _(A + B) + C != A + (B + C)_. So instead, we check that the outputs are close within some `atol` and `rtol` thresholds.
 
 We'll test across `float32` and `bfloat16`, using `atol=1e-3, rtol=1e-3`, a reasonable tolerance for mixed-precision arithmetic:
+
 
 ```python
 def test_kernel_correctness(
@@ -145,19 +146,18 @@ for hidden_size in HIDDEN_SIZES:
 
 ```
 
-```
-hidden   dtype        passed     max |diff|      mean |diff|    
-------------------------------------------------------------
-2048     float32      ✓ PASS     9.54e-07        8.49e-09       
-2048     bfloat16     ✓ PASS     0.00e+00        0.00e+00       
-------------------------------------------------------------
-4096     float32      ✓ PASS     9.54e-07        3.64e-09       
-4096     bfloat16     ✓ PASS     0.00e+00        0.00e+00       
-------------------------------------------------------------
-8192     float32      ✓ PASS     1.43e-06        7.09e-09       
-8192     bfloat16     ✓ PASS     0.00e+00        0.00e+00       
-------------------------------------------------------------
-```
+    hidden   dtype        passed     max |diff|      mean |diff|    
+    ------------------------------------------------------------
+    2048     float32      ✓ PASS     9.54e-07        8.49e-09       
+    2048     bfloat16     ✓ PASS     0.00e+00        0.00e+00       
+    ------------------------------------------------------------
+    4096     float32      ✓ PASS     9.54e-07        2.42e-09       
+    4096     bfloat16     ✓ PASS     0.00e+00        0.00e+00       
+    ------------------------------------------------------------
+    8192     float32      ✓ PASS     9.54e-07        1.19e-09       
+    8192     bfloat16     ✓ PASS     0.00e+00        0.00e+00       
+    ------------------------------------------------------------
+
 
 We see that the tests pass for both fp32 and bf16, and the maximum and mean absolute differences are well within the specified tolerances. **We also notice that the bf16 kernel seems bit-exact with an error of 0.0** this is because of bf16's lower granularity and being unable to capture small differences between values; however, we'll demonstrate that while this might be true for inputs with a normal distribution, it isn't always true for inputs with a different distribution.
 
@@ -169,6 +169,7 @@ The synthetic test isn't representative of what the kernel sees inside the model
 2. **Activations** on the residual stream grow in magnitude with depth and contain a small number of outlier feature dimensions whose magnitudes are 10-100× the median.
 
 To check whether the kernel actually agrees on real inputs, let's sample directly from `Qwen3-0.6B` itself: capture the input activations and the learned weights at every RMSNorm in the model during a real forward pass, then re-run the same kernel comparison on those tensors.
+
 
 <details>
 <summary>Show code</summary>
@@ -237,20 +238,19 @@ for dtype_name, dtype in [("float32", torch.float32), ("bfloat16", torch.bfloat1
 
 </details>
 
-```
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
-Loading weights: 100%|██████████| 311/311 [00:00<00:00, 2283.76it/s]
-Captured 113 (hidden_state, weight) pairs from Qwen3-0.6B
+    Captured 113 (hidden_state, weight) pairs from Qwen3-0.6B
+    
 
-float32     sites with non-zero max|diff|: 113/113
-            max|diff|   over sites:  max=6.10e-05
-            mean|diff|  over sites:  max=2.53e-07
 
-bfloat16    sites with non-zero max|diff|: 4/113
-            max|diff|   over sites:  max=1.56e-02
-            mean|diff|  over sites:  max=5.39e-07
-```
+    float32     sites with non-zero max|diff|: 113/113
+                max|diff|   over sites:  max=6.10e-05
+                mean|diff|  over sites:  max=2.54e-07
+    
+    bfloat16    sites with non-zero max|diff|: 5/113
+                max|diff|   over sites:  max=1.56e-02
+                mean|diff|  over sites:  max=7.46e-07
+    
+
 
 We can see now that even in bf16, there are a few places in the model where the error is nonzero. What's worse, the max error is on the order of `1e-2`. This shows that while the two kernels are close enough to be indistinguishable on synthetic inputs, they do diverge on real model inputs.
 
@@ -270,6 +270,7 @@ $$\mathbf{h}_l = \mathbf{h}_{l-1} + f_l(\text{RMSNorm}(\mathbf{h}_{l-1}))$$
 
 Let's see how these perturbations can translate into differences in the output tokens of the model.
 
+
 ```python
 model_bf16.eval()
 
@@ -278,13 +279,13 @@ print(f"Num layers  : {model_bf16.config.num_hidden_layers}")
 print(f"Parameters  : {sum(p.numel() for p in model_bf16.parameters()) / 1e6:.0f}M")
 ```
 
-```
-Hidden size : 1024
-Num layers  : 28
-Parameters  : 596M
-```
+    Hidden size : 1024
+    Num layers  : 28
+    Parameters  : 596M
+
 
 We'll create a few functions to help with swapping the RMSNorm kernel from the Transformers library with the one from Liger.
+
 
 ```python
 def _get_rmsnorm_params(module):
@@ -330,6 +331,7 @@ The ``patch_model_rmsnorm`` function replaces the forward method of every RMSNor
 Greedy decoding is a deterministic sampling method. At each step, the token with the highest predicted probability is selected as the output. If our kernels are exactly the same, then both the patched and unpatched models should produce the same output tokens at each step. 
 
 Let's run the same 3 prompts through both the original model and the kernel-swapped model and find where they first disagree:
+
 
 ```python
 TEST_PROMPTS = [
@@ -405,23 +407,24 @@ for d in divergence_data:
     print()
 ```
 
-<pre>[transformers] The following generation flags are not valid and may be ignored: [&#x27;top_p&#x27;, &#x27;top_k&#x27;]. Set `TRANSFORMERS_VERBOSITY=info` for more details.
-Patched 113 RMSNorm modules
-Unpatched 113 RMSNorm modules
-Prompt   : &#x27;The capital of France is&#x27;
-Original (unpatched): &#x27; Paris. The capital of Italy is Rome. The capital of Spain is Madrid. The capital of China is Beijing. The capital of Japan is Tokyo. The capital of India is New Delhi. The capital&#x27;
-Swapped  (patched)  : &#x27; Paris. The capital of Italy is Rome. The capital of Spain is Madrid. The capital of China is Beijing. The capital of Japan is Tokyo. The capital of India is New Delhi. The capital&#x27;
-Diverges at token position: identical
+    Patched 113 RMSNorm modules
+    Unpatched 113 RMSNorm modules
+    Prompt   : 'The capital of France is'
+    Original (unpatched): [32m' Paris. The capital of France is also the capital of the Republic of France. The capital of France is also the capital of the European Union. The capital of France is also the capital of the United'[0m
+    Swapped  (patched)  : [34m' Paris. The capital of France is also the capital of the Republic of France. The capital of France is also the capital of the European Union. The capital of France is also the capital of the United'[0m
+    Diverges at token position: identical
+    
+    Prompt   : "In 1969, NASA's Apollo 11 mission successfully landed humans on"
+    Original (unpatched): [32m" the Moon. The Moon's surface is covered with a large number of craters, and the[1m average number of craters per square kilometer is 1.5. What is the probability that a[0m[32m'[0m
+    Swapped  (patched)  : [34m" the Moon. The Moon's surface is covered with a large number of craters, and the[1m number of craters is increasing. The number of craters on the Moon is given by the function $[0m[34m'[0m
+    Diverges at token position: 19
+    
+    Prompt   : 'The chemical symbol for gold is'
+    Original (unpatched): [32m' Au. What is the[1m name of the element with the chemical symbol Au? Also, what is the chemical symbol for the element with the chemical symbol Au? Additionally, what is the chemical symbol for the[0m[32m'[0m
+    Swapped  (patched)  : [34m' Au. What is the[1m chemical symbol for the element that has the same number of protons as the number of electrons in the neutral atom of gold?\nAnswer:\nTo find the chemical symbol for the element[0m[34m'[0m
+    Diverges at token position: 5
+    
 
-Prompt   : &quot;In 1969, NASA&#x27;s Apollo 11 mission successfully landed humans on&quot;
-Original (unpatched): &quot; the Moon. The Moon&#x27;s surface is covered with a large number of craters, and the<strong style="font-weight:700"> number of craters is increasing. The number of craters on the Moon is given by the function $</strong>&#x27;
-Swapped  (patched)  : &quot; the Moon. The Moon&#x27;s surface is covered with a large number of craters, and the<strong style="font-weight:700"> average number of craters per square kilometer is 1.5. What is the probability that a</strong>&#x27;
-Diverges at token position: 19
-
-Prompt   : &#x27;The chemical symbol for gold is&#x27;
-Original (unpatched): &#x27; Au. What is the chemical symbol for the element that has the same number of protons as the number of electrons in<strong style="font-weight:700"> the neutral atom of gold?\nAnswer:\nThe chemical symbol for gold is **Au</strong>&#x27;
-Swapped  (patched)  : &#x27; Au. What is the chemical symbol for the element that has the same number of protons as the number of electrons in<strong style="font-weight:700"> a neutral atom of gold?\nAnswer:\nThe chemical symbol for gold is **Au</strong>&#x27;
-Diverges at token position: 24</pre>
 
 We can see that while the output for the first prompt remains the same, the second prompt diverges at the 19th token, and the third prompt first diverges at the 5th token (the diverging subsequences are bolded). **This shows that the perturbations introduced by swapping the kernel can compound and lead to different output tokens even with greedy decoding.**
 
@@ -432,6 +435,7 @@ We can see that while the output for the first prompt remains the same, the seco
 Let's demonstrate that the diverging outputs stem from errors accumulating in the hidden states as we go deeper into the model.
 
 We'll capture the hidden states at the output of each decoder layer for both the original and swapped model, then compute the **mean squared error** between them at each `(layer, token_position)` point. We'll use the prompt _"The 2010 FIFA World Cup hosted by South Africa was won by Spain."_ for this analysis.
+
 
 ```python
 @torch.no_grad()
@@ -456,7 +460,18 @@ def compute_diff_matrix(
 
 ```
 
-![](./cell26_img1.png)
+    Analysing 18 tokens in bf16...
+    Patched 113 RMSNorm modules
+    Unpatched 113 RMSNorm modules
+    bf16 max MSE across all layers/positions: 6.7076e-02
+    bf16 mean MSE: 4.1506e-03
+
+
+
+    
+![png](output_26_0.png)
+    
+
 
 We see a common pattern emerging across most of the tokens: as we go deeper into the model, starting from around the 21st layer, the MSE between the hidden states starts to accumulate and grow larger.
 
@@ -474,6 +489,7 @@ For each of 100 randomly sampled questions, we:
 
 A swap that is "the same model" should produce near-zero JSD and identical argmax answers on every question. We'll see how close to that ideal the swapped kernel really is, and on the questions where it isn't, we'll plot the shift in answer-letter probabilities.
 
+
 ```python
 import random
 
@@ -488,13 +504,30 @@ mmlu_pro_questions = [ds[i] for i in sampled_idx]
 print(f"Sampled {len(mmlu_pro_questions)} questions from MMLU-Pro")
 ```
 
-```
-Sampled 100 questions from MMLU-Pro
-```
+    Sampled 100 questions from MMLU-Pro
+
 
 A sample question from MMLU-Pro looks like:
 
+    Question: Bob writes down a number between 1 and 1,000. Mary must identify that number by asking "yes/no" questions of Bob. Mary knows that Bob always tells the truth. If Mary uses an optimal strategy, then she will determine the answer at the end of exactly how many questions in the worst case?
+    Options:
+    A. 250
+    B. 20
+    C. 500
+    D. 100
+    E. 2
+    F. 1,000
+    G. 999
+    H. 50
+    I. 10
+    Answer:
+    
+    Valid answer letters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+    Gold answer: I
+
+
 Let's create some functions to help with extracting the probability scores for each of the options and computing the JSD between the two distributions.
+
 
 <details>
 <summary>Show code</summary>
@@ -545,6 +578,7 @@ def letter_argmax(logits: torch.Tensor, letters: list[str]) -> tuple[str, dict[s
 
 </details>
 
+
 <details>
 <summary>Show code</summary>
 
@@ -587,27 +621,42 @@ print(f"  (upper bound: ln 2 = {np.log(2):.4f} nats)")
 
 </details>
 
-```
-MMLU-Pro: original kernel: 100%|██████████| 100/100 [00:03<00:00, 31.03it/s]
-Patched 113 RMSNorm modules
-MMLU-Pro: swapped kernel: 100%|██████████| 100/100 [00:03<00:00, 31.19it/s]
-Unpatched 113 RMSNorm modules
+    MMLU-Pro: original kernel: 100%|██████████| 100/100 [00:02<00:00, 44.61it/s]
 
-JS divergence(P_orig, P_swap) over 100 MMLU-Pro questions:
-  mean    : 1.0933e-03  nats
-  median  : 8.4837e-04  nats
-  max     : 8.4279e-03  nats
-  min     : 7.8647e-05  nats
-  (upper bound: ln 2 = 0.6931 nats)
-```
+
+    Patched 113 RMSNorm modules
+
+
+    MMLU-Pro: swapped kernel: 100%|██████████| 100/100 [00:02<00:00, 40.70it/s]
+
+
+    Unpatched 113 RMSNorm modules
+    
+    JS divergence(P_orig, P_swap) over 100 MMLU-Pro questions:
+      mean    : 1.0699e-03  nats
+      median  : 9.1873e-04  nats
+      max     : 3.2707e-03  nats
+      min     : 7.0100e-05  nats
+      (upper bound: ln 2 = 0.6931 nats)
+
 
 ### Putting the JSD numbers in context
 
 JSD is bounded in $[0, \ln 2 \approx 0.693]$ nats. With a mean JSD of `1.07e-3`, we can conclude that **while the output distributions are very close, they are not identical.** Next, let's quantify how much the probability mass shifted between the original and swapped models for the answer options `A`-`J`:
 
-![](./cell36_img1.png)
+    Mean of per-question mean |delta prob| (all 100 questions) : 6.7675e-03
+      unchanged (n=95)                                : 6.7427e-03
+      flipped   (n=5)                                 : 7.2382e-03
+
+
+
+    
+![png](output_36_1.png)
+    
+
 
 We see that, on average, the probability score of any given option changed by only `0.007`, i.e., `0.7%`. However, even a small shift like this can change the argmax answer if the original probabilities were close to each other, which is what results in the 5 flipped answers we see in the next section.
+
 
 ```python
 n_flipped = sum(1 for r in results if r['orig_pick'] != r['swap_pick'])
@@ -621,14 +670,13 @@ print(f"Accuracy (swapped kernel)  : {swap_correct}/{n}  ({100 * swap_correct / 
 print(f"Accuracy delta             : {swap_correct - orig_correct:+d}  ({100 * (swap_correct - orig_correct) / n:+.1f}%)")
 ```
 
-```
+    
+    Argmax answer flipped: 5 / 100 questions
+    
+    Accuracy (original kernel) : 23/100  (23.0%)
+    Accuracy (swapped kernel)  : 24/100  (24.0%)
+    Accuracy delta             : +1  (+1.0%)
 
-Argmax answer flipped: 6 / 100 questions
-
-Accuracy (original kernel) : 23/100  (23.0%)
-Accuracy (swapped kernel)  : 25/100  (25.0%)
-Accuracy delta             : +2  (+2.0%)
-```
 
 ### Accuracy and Flipped Responses
 
@@ -638,7 +686,11 @@ This shows us that it is important to re-benchmark a model, especially with the 
 
 Let's look at the 5 questions where the argmax answer flipped, and see how the probabilities of each of the options shifted for those questions:
 
-![](./cell40_img1.png)
+
+    
+![png](output_40_0.png)
+    
+
 
 We observe that for the questions corresponding to the flipped answers, the original model had two or more answer options with close probabilities, and the kernel swap caused a 2-3% shift in those probabilities, which was enough to change the argmax answer. **This highlights that using confidence-interval/margin-based token selection methods might be more robust than simple argmax selection in the presence of kernel-induced perturbations.**
 
