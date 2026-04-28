@@ -1,0 +1,16 @@
+[project]
+name = "kernel-swapping-performance"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1.0",
+    "transformers>=4.50.0",
+    "liger-kernel",
+    "datasets",
+    "matplotlib",
+    "seaborn",
+    "numpy",
+    "tqdm",
+    "accelerate",
+]
+
