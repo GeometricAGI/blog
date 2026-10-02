@@ -43,21 +43,14 @@ def make_weight(k: int, n: int, sparsity: float, mode: str, dtype: torch.dtype) 
         n: Columns of the weight.
         sparsity: Fraction of entries set to zero, in [0, 1).
         mode: ``random`` zeroes entries uniformly at random, ``magnitude`` zeroes the
-            smallest-magnitude entries, ``2:4`` keeps the 2 largest of every 4
-            consecutive entries along ``k`` (``sparsity`` is ignored, always 50%).
+            smallest-magnitude entries.
         dtype: Output dtype.
 
     Returns:
         A dense ``(k, n)`` CUDA tensor containing the zeros.
     """
     w = torch.randn(k, n, device="cuda", dtype=torch.float32)
-    if mode == "2:4":
-        groups = w.abs().reshape(k // 4, 4, n)
-        drop = groups.topk(2, dim=1, largest=False).indices
-        mask = torch.ones_like(groups, dtype=torch.bool)
-        mask.scatter_(1, drop, False)
-        w = w * mask.reshape(k, n)
-    elif sparsity > 0:
+    if sparsity > 0:
         if mode == "random":
             w = w * (torch.rand_like(w) >= sparsity)
         else:
@@ -135,8 +128,8 @@ def main() -> None:
     dtype = getattr(torch, args.dtype)
     torch.manual_seed(0)
 
-    # configs: (mode, sparsity). dense baseline once, 2:4 once.
-    configs = [("dense", 0.0)] + [(m, s) for m in args.modes for s in args.sparsities if s > 0] + [("2:4", 0.5)]
+    # configs: (mode, sparsity), with one dense baseline.
+    configs = [("dense", 0.0)] + [(m, s) for m in args.modes for s in args.sparsities if s > 0]
     weights = {}
     for mode, s in configs:
         weights[(mode, s)] = make_weight(args.k, args.n, s, "random" if mode == "dense" else mode, dtype)
