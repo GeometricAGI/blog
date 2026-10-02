@@ -3,6 +3,9 @@
 Times dense ``torch.matmul`` replayed through a CUDA graph with the weight zeroed to
 different degrees. Also logs SM clock and power so a speedup can be attributed to
 data-dependent power/clock effects rather than skipped work.
+
+Each graph rotates through ``--copies`` independent weights, activations and outputs, so
+consecutive uses of the same tensor are separated by far more than the L2 capacity.
 """
 
 import argparse
@@ -17,7 +20,8 @@ try:
     import pynvml
 
     pynvml.nvmlInit()
-    NVML_HANDLE = pynvml.nvmlDeviceGetHandleByIndex(0)
+    # Look the device up by UUID: NVML indexes physical GPUs and ignores CUDA_VISIBLE_DEVICES.
+    NVML_HANDLE = pynvml.nvmlDeviceGetHandleByUUID(f"GPU-{torch.cuda.get_device_properties(0).uuid}")
 except Exception:  # pragma: no cover - NVML is optional
     NVML_HANDLE = None
 
@@ -50,39 +54,43 @@ def make_weight(k: int, n: int, sparsity: float, mode: str, dtype: torch.dtype) 
         A dense ``(k, n)`` CUDA tensor containing the zeros.
     """
     w = torch.randn(k, n, device="cuda", dtype=torch.float32)
-    if sparsity > 0:
-        num_zero = round(sparsity * w.numel())
+    num_zero = round(sparsity * w.numel())
+    if num_zero > 0:
         if mode == "random":
             zero_idx = torch.randperm(w.numel(), device="cuda")[:num_zero]
             w.view(-1)[zero_idx] = 0
         else:
             thresh = w.abs().flatten().kthvalue(num_zero).values
-            w = w * (w.abs() > thresh)
+            # torch.where gives +0.0; multiplying by a mask would leave -0.0 for negative weights
+            w = torch.where(w.abs() > thresh, w, 0.0)
     return w.to(dtype).contiguous()
 
 
-def capture(x: torch.Tensor, w: torch.Tensor, reps: int):
-    """Capture ``reps`` back-to-back matmuls ``x @ w`` into one CUDA graph.
+def capture(xs: list, ws: list, outs: list, reps: int):
+    """Capture ``reps`` back-to-back matmuls into one CUDA graph, rotating through the copies.
+
+    Matmul ``i`` uses ``xs[i % len(xs)] @ ws[i % len(ws)]``, so the same tensors are only
+    touched again after ``len(xs) - 1`` other matmuls' worth of traffic.
 
     Args:
-        x: Activation of shape ``(m, k)``.
-        w: Weight of shape ``(k, n)``.
-        reps: Matmuls per graph, to amortize the graph launch.
+        xs: Activations, each of shape ``(m, k)``.
+        ws: Weights, each of shape ``(k, n)``; same length as ``xs``.
+        outs: Output buffers, each of shape ``(m, n)``; same length as ``xs``.
+        reps: Matmuls per graph, a multiple of ``len(xs)``.
 
     Returns:
         The captured ``torch.cuda.CUDAGraph``.
     """
-    out = torch.empty(x.shape[0], w.shape[1], device="cuda", dtype=x.dtype)
     side = torch.cuda.Stream()
     side.wait_stream(torch.cuda.current_stream())
     with torch.cuda.stream(side):
-        for _ in range(3):
-            torch.matmul(x, w, out=out)
+        for i in range(3):
+            torch.matmul(xs[i % len(xs)], ws[i % len(ws)], out=outs[i % len(outs)])
     torch.cuda.current_stream().wait_stream(side)
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):
-        for _ in range(reps):
-            torch.matmul(x, w, out=out)
+        for i in range(reps):
+            torch.matmul(xs[i % len(xs)], ws[i % len(ws)], out=outs[i % len(outs)])
     return graph
 
 
@@ -123,6 +131,7 @@ def main() -> None:
     p.add_argument("--sparsities", type=float, nargs="+", default=[0, 0.05, 0.10, 0.25, 0.50, 0.70, 0.90, 0.99])
     p.add_argument("--modes", nargs="+", default=["random", "magnitude"])
     p.add_argument("--rounds", type=int, default=5)
+    p.add_argument("--copies", type=int, default=8, help="Independent weights/activations rotated through per graph.")
     p.add_argument("--dtype", default="bfloat16")
     p.add_argument("--tag", default="unlocked", help="Run label, e.g. 'unlocked' or 'locked-1200mhz'.")
     p.add_argument("--results-dir", default="results", help="Results go to <results-dir>/<gpu>/<tag>.json.")
@@ -134,18 +143,24 @@ def main() -> None:
     configs = [("dense", 0.0)] + [(m, s) for m in args.modes for s in args.sparsities if s > 0]
     weights, zero_frac = {}, {}
     for mode, s in configs:
-        weights[(mode, s)] = make_weight(args.k, args.n, s, "random" if mode == "dense" else mode, dtype)
-        zero_frac[(mode, s)] = (weights[(mode, s)] == 0).sum().item() / weights[(mode, s)].numel()
-        print(f"built {mode} {s}: actual zero frac {zero_frac[(mode, s)]:.6f}", flush=True)
+        weights[(mode, s)] = [
+            make_weight(args.k, args.n, s, "random" if mode == "dense" else mode, dtype) for _ in range(args.copies)
+        ]
+        fracs = [(w == 0).sum().item() / w.numel() for w in weights[(mode, s)]]
+        zero_frac[(mode, s)] = statistics.mean(fracs)
+        print(f"built {mode} {s} x{args.copies}: zero frac {min(fracs):.6f}..{max(fracs):.6f}", flush=True)
 
     results = []
     for m in args.ms:
-        x = torch.randn(m, args.k, device="cuda", dtype=dtype)
-        # keep the whole sweep ~constant wall time: fewer reps for big problems
+        xs = [torch.randn(m, args.k, device="cuda", dtype=dtype) for _ in range(args.copies)]
+        outs = [torch.empty(m, args.n, device="cuda", dtype=dtype) for _ in range(args.copies)]
+        # keep the whole sweep ~constant wall time: fewer reps for big problems, but always
+        # a whole number of passes over the copies so every graph rotates through all of them
         flops = 2 * m * args.k * args.n
-        reps = max(1, min(50, int(2e12 / flops)))
+        budget = max(1, min(50, int(2e12 / flops)))
+        reps = args.copies * -(-budget // args.copies)
         replays = max(5, min(200, int(4e13 / (flops * reps))))
-        graphs = {c: capture(x, weights[c], reps) for c in configs}
+        graphs = {c: capture(xs, weights[c], outs, reps) for c in configs}
         samples = {c: [] for c in configs}
         for r in range(args.rounds):
             # alternate order each round so thermal/clock drift hits every config equally
@@ -161,7 +176,7 @@ def main() -> None:
                 "tflops": flops / (statistics.median(us) * 1e-6) / 1e12,
             }
             results.append(row)
-        del graphs
+        del graphs, xs, outs
         base = next(r for r in results if r["m"] == m and r["mode"] == "dense")["us_median"]
         print(f"\nM={m} K={args.k} N={args.n} {args.dtype} (reps/graph={reps}, replays={replays})")
         print(f"{'mode':10s}{'sparsity':>9s}{'us':>10s}{'vs dense':>10s}{'TFLOPS':>9s}{'SM MHz':>8s}{'W':>7s}")
