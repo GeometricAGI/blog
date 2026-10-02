@@ -18,6 +18,6 @@ Results live in `results/<gpu>/<tag>.json` (+ `.png`), one directory per GPU, wi
 | H100 80GB HBM3 (700 W) | `results/h100/unlocked.json`, `locked-{1000,1200,1400,1600,1800,1980}mhz.json` |
 | B200 (1000 W) | `results/b200/unlocked.json`, `locked-{1000,1200,1400,1600,1800,1965}mhz.json` |
 
-Each timing is the median of 5 rounds; configs are interleaved and the order alternates each round. `sm_mhz` and
+Each graph rotates through `--copies` (default 8) independent weights, activations and outputs so consecutive uses of a tensor are far apart in L2 terms. Each timing is the median of 5 rounds; configs are interleaved and the order alternates each round. `sm_mhz` and
 `watts` are NVML samples taken while the replays run, so treat `watts` as indicative (NVML power updates slower
 than the shortest runs).
