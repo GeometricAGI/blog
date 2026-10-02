@@ -42,8 +42,8 @@ def make_weight(k: int, n: int, sparsity: float, mode: str, dtype: torch.dtype) 
         k: Rows of the weight (the contraction dimension).
         n: Columns of the weight.
         sparsity: Fraction of entries set to zero, in [0, 1).
-        mode: ``random`` zeroes entries uniformly at random, ``magnitude`` zeroes the
-            smallest-magnitude entries.
+        mode: ``random`` zeroes exactly ``round(sparsity * k * n)`` entries chosen
+            uniformly at random, ``magnitude`` zeroes the smallest-magnitude entries.
         dtype: Output dtype.
 
     Returns:
@@ -51,10 +51,12 @@ def make_weight(k: int, n: int, sparsity: float, mode: str, dtype: torch.dtype) 
     """
     w = torch.randn(k, n, device="cuda", dtype=torch.float32)
     if sparsity > 0:
+        num_zero = round(sparsity * w.numel())
         if mode == "random":
-            w = w * (torch.rand_like(w) >= sparsity)
+            zero_idx = torch.randperm(w.numel(), device="cuda")[:num_zero]
+            w.view(-1)[zero_idx] = 0
         else:
-            thresh = w.abs().flatten().kthvalue(int(sparsity * w.numel())).values
+            thresh = w.abs().flatten().kthvalue(num_zero).values
             w = w * (w.abs() > thresh)
     return w.to(dtype).contiguous()
 
@@ -130,11 +132,11 @@ def main() -> None:
 
     # configs: (mode, sparsity), with one dense baseline.
     configs = [("dense", 0.0)] + [(m, s) for m in args.modes for s in args.sparsities if s > 0]
-    weights = {}
+    weights, zero_frac = {}, {}
     for mode, s in configs:
         weights[(mode, s)] = make_weight(args.k, args.n, s, "random" if mode == "dense" else mode, dtype)
-        z = (weights[(mode, s)] == 0).float().mean().item()
-        print(f"built {mode} {s}: actual zero frac {z:.3f}", flush=True)
+        zero_frac[(mode, s)] = (weights[(mode, s)] == 0).sum().item() / weights[(mode, s)].numel()
+        print(f"built {mode} {s}: actual zero frac {zero_frac[(mode, s)]:.6f}", flush=True)
 
     results = []
     for m in args.ms:
@@ -154,7 +156,7 @@ def main() -> None:
             us = [s["us"] for s in samples[c]]
             row = {
                 "m": m, "mode": c[0], "sparsity": c[1], "us_median": statistics.median(us),
-                "us_min": min(us), "sm_mhz": statistics.median(s["sm_mhz"] for s in samples[c]) if NVML_HANDLE else None,
+                "us_min": min(us), "zero_frac": zero_frac[c], "sm_mhz": statistics.median(s["sm_mhz"] for s in samples[c]) if NVML_HANDLE else None,
                 "watts": statistics.median(s["watts"] for s in samples[c]) if NVML_HANDLE else None,
                 "tflops": flops / (statistics.median(us) * 1e-6) / 1e12,
             }
